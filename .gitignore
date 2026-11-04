@@ -1,0 +1,29 @@
+# Python virtual environments (CRM is a venv, not source code)
+CRM/
+.venv/
+venv/
+env/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+
+# IDE / OS junk
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Build / test artifacts
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
