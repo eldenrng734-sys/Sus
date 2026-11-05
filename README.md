@@ -46,3 +46,13 @@ variables or a `.env` file, which is git-ignored.
 ## Status
 
 Early scaffold: only the health endpoint exists so far.
+
+# AI Sales Assistant CRM
+
+## Run locally
+1. `Copy-Item .env.example .env`
+2. `docker compose -f infrastructure/docker-compose.yml --env-file .env up --build`
+3. Open http://localhost:8000/docs
+
+## Test locally (from the backend folder)
+`ruff check .` then `ruff format --check .` then `pytest`
