@@ -8,3 +8,4 @@ psycopg[binary]
 pytest
 httpx
 ruff
+argon2-cffi
