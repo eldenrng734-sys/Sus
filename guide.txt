@@ -1,0 +1,513 @@
+# AI SALES ASSISTANT CRM - PROJECT GUIDE (MVP)
+
+## 0. CONVENTIONS
+- [HARD] = hard task. Each dev owns exactly 3 (see section 7).
+- [SEC] = security-critical code: auth, tenant context/RLS, RBAC, webhooks.
+- "Dev N" = team member N. Day 0 = setup. Build days = 1-15.
+- Times are Asia/Dhaka. Paths are repo-relative.
+
+## 1. PROJECT
+Goal: 5 devs build a working, secure, multi-tenant AI Sales Assistant CRM (MVP) in 15 build days (5h/day) + Day 0.
+Business value: সম্ভাব্য Customer-দের সংগঠিত করা এবং Follow-up সহজ করা (organize prospects, make follow-up easy).
+Stack: Python 3.12 + FastAPI | PostgreSQL 16 | LLM API | n8n | React/Next.js | Docker.
+Product: multi-tenant SaaS CRM. Many companies (tenants) share one app + one DB. Each company's leads, conversations, users, integrations, reports are private to it.
+
+Lead journey: Capture -> one CRM record with history -> AI intent + classification + score -> assign rep -> n8n follow-up -> dashboard.
+
+Features (feature | behavior | module):
+- Lead Capture | website form, WhatsApp, Facebook/Instagram, manual, CSV | integrations, leads
+- Lead Classification | AI: type, interest, priority, score | ai
+- Intent Detection | AI: demo/pricing/support/info, buying stage, sentiment | ai
+- Auto Follow-up | n8n reminders + approved follow-ups; stop on reply or opt-out | tasks, n8n/
+- CRM Integration | own REST API + webhooks; HubSpot/Salesforce later (optional, post-MVP) | integrations, API
+- Sales Dashboard | role-based: rep, manager, company admin | dashboard, frontend
+
+## 2. NON-NEGOTIABLES
+Security rule: never skip or weaken a security step to save time. Cut features instead.
+
+Two-approval rule: any PR touching auth, tenant context/RLS, RBAC or webhooks needs the ring reviewer + Dev 1 (Dev 4 if Dev 1 is author). No exceptions.
+
+Never cut: RLS, auth, webhook signatures, MFA, encrypted credentials, cross-tenant tests.
+
+Responsibility split:
+- FastAPI: decides who can see/do what; holds all business rules.
+- PostgreSQL: system of record. Not in DB = did not happen.
+- LLM: reads text, gives opinion (intent, score). Never changes data, permissions or sends messages.
+- n8n: runs scheduled/repeated jobs. Always via our API, never direct DB.
+- React: displays data, sends user actions to API.
+
+## 3. GLOSSARY
+- Tenant: one customer company.
+- RLS: PostgreSQL row-level security; hides other tenants' rows even if app code forgets a filter.
+- RBAC: role-based access control.
+- JWT/refresh token: short-lived access token + rotating refresh token.
+- Argon2id: password hashing; real passwords never stored.
+- Webhook: external service (WhatsApp/Meta) calls our URL.
+- Signature check: proves webhook came from the provider.
+- Idempotency/dedup: same request twice = same effect as once.
+- Structured JSON output: LLM answers in fixed schema, validated by Pydantic.
+- Migration (Alembic): versioned DB schema change.
+- PII: personal data (name, phone, email).
+- OpenAPI: API contract, visible at /docs.
+
+## 4. MVP SCOPE
+IN (must ship):
+- Company signup + invite-based users
+- Roles: sales rep, manager, company admin (+ platform admin = our team)
+- Tenant isolation via PostgreSQL RLS
+- Lead capture: website form, manual, CSV import, WhatsApp Cloud API
+- Meta Lead Ads / Messenger in TEST mode
+- Lead list, detail, assignment, status pipeline, notes, tasks
+- AI classification, intent, scoring, summary, sentiment
+- n8n: new-lead flow, follow-up reminders, reply handling
+- Rep / manager / admin dashboards
+- Docker deployment, backups, security tests
+
+OUT (after Day 15):
+- Instagram + forum integrations
+- HubSpot/Salesforce sync
+- Billing, subscriptions, quotas
+- Self-hosted LLM, vector DB, AI agents
+- Microservices / Kubernetes
+- n8n queue mode with Redis workers
+- Separate DB per enterprise tenant
+
+WARNING: Meta/WhatsApp production needs app review + business verification. Start Meta developer app + WhatsApp test number on Day 1 so it is ready by Day 7.
+
+## 5. ARCHITECTURE
+Flow (top to bottom):
+1. Lead sources: website form, tracking script, WhatsApp, Facebook, manual, CSV
+2. Integration layer: webhooks, signature check, validation, dedup (webhook_events)
+3. FastAPI backend: auth, tenant context, RBAC, leads, tasks, conversations, API
+   - PostgreSQL (RLS): system of record
+   - LLM service: analysis only
+   - n8n: reminders, follow-ups, notifications
+4. Next.js dashboard: sales rep, manager, company admin
+
+Build ONE modular app first. Do not start with microservices, Kubernetes, a vector DB or an agent framework.
+
+## 6. STACK
+- Frontend: Next.js + React + TypeScript
+- UI: Tailwind CSS + shadcn/ui + Recharts
+- Data fetching: TanStack Query
+- Backend: Python 3.12 + FastAPI
+- DB: PostgreSQL 16 + RLS
+- ORM/migrations: SQLAlchemy 2 + Alembic
+- Validation: Pydantic v2 (requests, responses, LLM output)
+- AI: LLM API, structured JSON output
+- Automation: n8n (self-hosted)
+- Auth: FastAPI + Argon2id + short-lived JWT + refresh rotation
+- Testing: pytest, httpx, Playwright
+- Deploy: Docker Compose + Caddy/Nginx (TLS)
+- Files: private S3-compatible storage
+
+## 7. TEAM & PROCESS
+
+### 7.1 Working model
+- All 5 devs work on the SAME layer each day, each on a DIFFERENT feature. Integrate + demo at end of day.
+- Tasks rotate so everyone learns every part.
+- 15 days x 5h = 75h per dev + Day 0.
+- [HARD] tasks per dev: Dev1 = D1, D6, D10 | Dev2 = D2, D7, D11 | Dev3 = D2, D7, D14 | Dev4 = D3, D8, D14 | Dev5 = D3, D10, D15.
+- Module builder fixes its bugs and documents it.
+
+### 7.2 Team rules
+- Mob first hour on Day 3 (RLS) and Day 7 (webhooks): all 5 on one screen, then split.
+- Ring review: Dev1 reviews Dev2; Dev2 -> Dev3; Dev3 -> Dev4; Dev4 -> Dev5; Dev5 -> Dev1.
+- [HARD] PRs need two reviewers.
+- [SEC] PRs: see section 2 two-approval rule.
+- Publish shared contracts (API conventions, capture service, dashboard queries) in the first hour of the day.
+- Announce in chat before creating a migration (avoid Alembic multiple heads).
+- Get one senior for ~1h on Days 3, 7, 14.
+
+### 7.3 Daily rhythm
+- 10:00-10:15 stand-up (yesterday, today, blockers)
+- 10:15-13:30 build own feature
+- 13:30-14:30 integration window: merge PRs, fix conflicts, run full tests
+- 14:30-15:00 team demo + plan tomorrow
+
+### 7.4 Git & quality
+- Branches: main (release) <- develop (daily integration) <- feature/<dev>-<feature>
+- Every PR: green CI (lint + tests) + required reviews
+- API contract (OpenAPI) agreed BEFORE coding
+- Small PRs; merge at least daily; no big-bang merge on Day 14
+- Conventional commits: feat:, fix:, test:, docs:
+
+### 7.5 Definition of Done (per task)
+- Code merged into develop
+- Unit/API tests written and passing
+- Tenant isolation respected (no query without tenant context)
+- Ring review done; [HARD] or [SEC] also approved by security approver
+- Endpoint visible in /docs
+- Demoed at end-of-day session
+
+## 8. PLAN OVERVIEW
+- Phase 0 Setup | D0 | tools, Docker, FastAPI + RLS primer | all 5 PCs open localhost:8000/docs
+- Phase 1 Foundation | D1-3 | repo, DB models, auth, multi-tenancy | signup/login works; cross-tenant tests pass
+- Phase 2 CRM core + first slice | D4-5 | CRM APIs, first UI, staging | log in on staging -> create lead -> see in list
+- Phase 3 Lead capture | D6-7 | capture pipeline, webhooks, integrations | all sources create leads via one service; no duplicates
+- Phase 4 AI | D8-9 | LLM pieces, wiring, evaluation | every new lead gets assessment; accuracy recorded
+- Phase 5 Automation | D10-11 | n8n workflows A, B, C | WhatsApp lead -> assessed -> assigned -> reminder -> reply -> follow-ups pause
+- Phase 6 Frontend + dashboards | D12-13 | screens, role dashboards | rep works fully in UI; each role sees only its data
+- Phase 7 Harden + ship | D14-15 | security, tests, deploy, demo | checklist tested; deployed MVP + live demo
+
+## 9. DAILY TASKS
+
+DAY 0 - Setup & primer
+  All: install tools, Docker, Git access; FastAPI + PostgreSQL RLS primer; read this guide.
+  CHECK: all 5 PCs open localhost:8000/docs.
+
+DAY 1 - Repo & DB models
+  Dev2: monorepo (frontend/, backend/, n8n/, infrastructure/), Docker Compose, FastAPI skeleton, CI (ruff + pytest).
+  Dev1 [HARD]: tenancy models: tenants, users, tenant_memberships, teams, audit_logs; composite FKs with tenant_id.
+  Dev3: lead models: leads, contacts, interactions, webhook_events, integrations; start Meta developer app + WhatsApp test number.
+  Dev4: conversations, messages, lead_assessments models; AI output JSON schema.
+  Dev5: tasks model, Alembic initial migration, seed script (2 companies, 5 users each).
+  CHECK: docker compose up -> migrate -> seed works on every PC; team agrees on API contract (section 16).
+
+DAY 2 - Authentication
+  Dev2 [HARD]: signup (tenant + admin), login, Argon2id, short-lived JWT access token.
+  Dev3 [HARD]: refresh token rotation, logout, revocation.
+  Dev1: password reset + email verification (Mailpit locally).
+  Dev4: invitations: invite, accept, deactivate, change role.
+  Dev5: audit log service + login rate limit.
+  CHECK: admin signs up, invites rep, rep logs in.
+
+DAY 3 - Multi-tenancy (mob first hour)
+  Dev4 [HARD]: tenant context middleware: verify membership; set_config('app.tenant_id', ..., true) per transaction.
+  Dev5 [HARD]: RLS policies on ALL tenant tables; non-superuser app DB role.
+  Dev1: RBAC dependencies (rep, manager, admin, platform admin).
+  Dev2: 2-tenant test fixtures + cross-tenant tests, WRITTEN FIRST.
+  Dev3: TOTP MFA for admins.
+  CHECK: cross-tenant tests pass; app role cannot bypass RLS.
+
+DAY 4 - CRM core APIs
+  Dev1: API conventions (pagination, errors, request IDs, logging), published in first hour.
+  Dev2: leads CRUD, status pipeline (new -> contacted -> qualified -> proposal -> won/lost) with lost reason, notes, search.
+  Dev3: teams API + manual assignment.
+  Dev4: conversations, messages, lead timeline.
+  Dev5: tasks API + due follow-ups.
+  CHECK: create lead -> assign -> note + task -> timeline, all in /docs.
+
+DAY 5 - First end-to-end slice & staging
+  Dev1: Next.js setup, Tailwind, shadcn/ui, API client with auth refresh.
+  Dev2: login, signup, accept-invite, reset pages.
+  Dev3: lead list page (search; filters by status/source/priority/owner; pagination).
+  Dev4: create-lead form + basic lead detail.
+  Dev5: staging server with Compose + auto-deploy from develop.
+  CHECK: log in on staging URL -> create lead -> see in list. Ugly is fine.
+
+DAY 6 - Capture pipeline
+  Dev1 [HARD]: lead-capture service: validate -> dedupe -> find-or-create -> store interaction -> emit lead.created.
+  Dev2: manual entry + CSV import with duplicate report.
+  Dev3: website form endpoint with consent + UTM.
+  Dev4: embeddable JS snippet + tracking-events endpoint.
+  Dev5: round-robin auto-assign + opt-out handling.
+  CHECK: form, CSV, manual entry create leads through one service.
+
+DAY 7 - Webhooks & integrations (mob first hour)
+  Dev2 [HARD]: webhook framework: signature check, webhook_events idempotency.
+  Dev3 [HARD]: encrypted integration credentials + integrations API.
+  Dev1: WhatsApp inbound + message storage.
+  Dev4: WhatsApp outbound send.
+  Dev5: Meta Lead Ads / Messenger webhook (test mode).
+  CHECK: same webhook sent twice creates no duplicates; bad signature rejected.
+
+DAY 8 - AI pieces
+  Dev4 [HARD]: LLM client wrapper: timeouts, retries, cost logging.
+  Dev1: PII redaction; store model + prompt version.
+  Dev2: classification + intent prompt, strict JSON, Pydantic validation, fallback.
+  Dev3: lead scoring + deterministic rules (priority, task creation, human approval).
+  Dev5: conversation summary + sentiment.
+  CHECK: one message in -> validated assessment out.
+
+DAY 9 - AI wiring & evaluation
+  Dev1: background job runner; auto-assess on new lead or message.
+  Dev2: evaluation set of 50 messages (English + Bangla) with expected labels.
+  Dev3: evaluation runner + accuracy report.
+  Dev4: prompt v2 + confidence threshold for human review.
+  Dev5: assessments API + human-review flag.
+  CHECK: every new lead gets an assessment; accuracy recorded.
+
+DAY 10 - n8n foundation
+  Dev5 [HARD]: n8n in Docker on private network, HMAC service auth.
+  Dev1 [HARD]: internal API endpoints with minimum scope + idempotency keys.
+  Dev2: backend event emitter (lead.created, message.received).
+  Dev3: Workflow A: new lead -> assess -> assign -> task -> notify.
+  Dev4: rep notification service.
+  CHECK: new lead triggers Workflow A automatically.
+
+DAY 11 - Follow-ups & replies
+  Dev2 [HARD]: Workflow B (follow-up): consent, opt-out, quiet hours, status checks.
+  Dev3: Workflow C: customer reply pauses follow-ups, re-runs intent.
+  Dev4: error/retry workflow, log redaction, execution data retention.
+  Dev1: follow-up approval API + quiet-hours settings.
+  Dev5: automation E2E script + workflow exports to n8n/workflows/.
+  CHECK: WhatsApp lead -> assessed -> assigned -> reminder -> reply -> follow-ups pause.
+
+DAY 12 - Frontend screens
+  Dev1: tasks page (today/overdue/upcoming) + follow-up approval queue.
+  Dev2: conversation inbox + reply box.
+  Dev3: lead detail: AI card, timeline, notes, status change.
+  Dev4: role-aware navigation, route guards, user + team pages.
+  Dev5: integrations settings page, form embed code, CSV upload UI, bulk assign on lead list.
+  CHECK: rep reads AI insight, replies, completes a task entirely in UI.
+
+DAY 13 - Dashboards (each dev builds API + UI for theirs)
+  Dev1: rep dashboard.
+  Dev2: manager dashboard.
+  Dev3: company admin dashboard.
+  Dev4: indexes, query performance, role-scope tests.
+  Dev5: automation + integration health widgets.
+  CHECK: each role sees only its own data; changing API params reveals nothing else.
+
+DAY 14 - Security & testing (also catch-up day)
+  Dev3 [HARD]: hardening: cookies, CSRF, CSP, headers, rate limits, dependency scan.
+  Dev4 [HARD]: full cross-tenant + RBAC test suite.
+  Dev1: Playwright end-to-end test.
+  Dev2: n8n failure tests + log/PII leak review.
+  Dev5: duplicate + signature failure tests, then walk through section 20 checklist.
+  CHECK: every checklist item tested; bug list prioritized.
+
+DAY 15 - Deploy & demo
+  Dev5 [HARD]: production Compose, TLS, private DB network, secrets.
+  Dev2: encrypted backups, restore test, export/delete script.
+  Dev1: demo data (2 companies) + demo script.
+  Dev3: critical bug fixes + UI polish.
+  Dev4: README, setup guide, user guide per role.
+  FINAL: live demo, retrospective, post-MVP backlog.
+
+IF BEHIND - cut in this order:
+  1. Meta Lead Ads/Messenger (D7)
+  2. tracking endpoint + round-robin (D6)
+  3. extra dashboard widgets (D13)
+  4. summary + sentiment (D8)
+  Never cut items listed in section 2.
+
+## 10. ROLES & PERMISSIONS
+- Sales rep: view assigned leads, update status, read conversations, add notes, complete tasks, approve permitted follow-ups.
+- Sales manager: view team leads, assign leads, monitor reps, review performance, manage team tasks.
+- Company admin: manage company users, roles, integrations, lead + automation settings, all company data.
+- Platform admin (our team): manage tenants, platform health, support. Separate from company admins.
+
+Rules:
+- Company admin is NEVER automatically platform admin.
+- Managers see own team; company admins see all teams in their company.
+- Support access to customer data must be temporary, approved and logged.
+
+## 11. MULTI-TENANCY & RLS [SEC]
+Design: one PostgreSQL DB, shared tables, tenant_id on every tenant-owned row, enforced by Row-Level Security. Built on Day 3, never added later. Do not simplify or skip anything here.
+
+Rules:
+- Never trust a tenant_id from the browser. Backend verifies user membership + role on EVERY request.
+- RLS enabled with no matching policy = deny by default.
+- Composite FKs include tenant_id (Company A's lead cannot link to Company B's user).
+- App DB role: not superuser, no BYPASSRLS. Use FORCE ROW LEVEL SECURITY so table owners are covered.
+- Apply the same policy to EVERY tenant-owned table.
+- Large customers may later get separate schema/DB.
+
+Policy template:
+```sql
+ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE leads FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY leads_tenant_isolation ON leads
+USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+```
+
+Per transaction (transaction-local; safe with connection pooling):
+```sql
+SELECT set_config('app.tenant_id', 'verified-tenant-uuid', true);
+```
+
+## 12. DATABASE
+Tables:
+- tenants: company accounts
+- users: identity
+- tenant_memberships: user <-> company + role
+- teams: sales teams per company
+- leads: details, source, status, owner, priority, score
+- contacts: customer records after conversion
+- conversations / messages: WhatsApp, Facebook, other chats
+- interactions: website activity, form submits, calls, events
+- lead_assessments: AI intent, classification, score, model + prompt version
+- tasks: calls, meetings, reminders, follow-ups
+- integrations: connected accounts, scopes, encrypted credentials
+- webhook_events: incoming events, processing status, dedup
+- audit_logs: security + important user actions
+
+leads columns: id, tenant_id, name, email, phone, company_name, source, source_campaign, external_id, status, lost_reason, assigned_user_id, team_id, intent, lead_score, priority, consent, opted_out, created_at, updated_at
+messages columns: id, tenant_id, conversation_id, provider_message_id, direction, message_text, attachment_reference, created_at
+
+Indexes: (tenant_id, created_at), (tenant_id, assigned_user_id), (tenant_id, status), UNIQUE (tenant_id, provider, provider_message_id).
+
+## 13. LEAD CAPTURE
+Sources:
+- Website forms: form POST to FastAPI -> name, email, phone, requirement, consent, UTM
+- Website activity: first-party tracking script -> page visits, pricing views, demo requests
+- Facebook Lead Ads: Meta lead webhook + API fetch -> form fields, campaign, ad
+- Messenger: Messenger Platform -> messages, conversation IDs
+- WhatsApp: Cloud API -> messages, phone, history
+- Manual/CSV: CRM form + import -> rep-entered details
+
+ONE pipeline for every channel (write once, test once):
+1. Endpoint receives webhook/form.
+2. Validate request + check provider signature.
+3. Skip if already processed (webhook_events); providers may send duplicates.
+4. Find or create lead (dedupe by email/phone/external ID).
+5. Store interaction/message.
+6. Request AI assessment.
+7. Assign lead + create task if rules say so.
+
+Notes:
+- Meta webhooks may contain only an ID; fetch details via API.
+- Prefer official APIs over scraping.
+- Disclose tracking; collect consent where required.
+
+## 14. AI: CLASSIFICATION & INTENT
+Principle: AI advises, our code decides. No autonomous agent.
+
+Pipeline: get permitted history -> redact unnecessary PII -> structured prompt -> validate with Pydantic -> save with model + prompt version -> deterministic rules decide tasks/approval.
+
+Example input: "I need a CRM for my 20-person sales team. Please arrange a demo this week."
+Example output:
+```json
+{
+  "category": "business_customer",
+  "intent": "request_demo",
+  "interest": "CRM software",
+  "buying_stage": "consideration",
+  "sentiment": "positive",
+  "priority": "high",
+  "lead_score": 90,
+  "recommended_action": "schedule_demo",
+  "follow_up_days": 0,
+  "confidence": 0.94
+}
+```
+
+Features:
+- Classification: type, industry, product interest, customer category
+- Intent: demo, pricing, support, info, complaint
+- Scoring: value/urgency estimate, combined with rule-based signals
+- Summary: summarizes long conversations
+- Sentiment: positive/neutral/negative
+- Recommended action: call, demo, email, follow-up
+
+Rules:
+- LLM never modifies data, assigns permissions or sends messages.
+- Confidence < 0.6 (example threshold) -> mark for human review.
+- Support Bangla + English; include both in evaluation set.
+- Privacy: text sent to a hosted LLM leaves our server; pick a provider with suitable retention + contract terms.
+
+## 15. N8N AUTOMATION
+n8n runs repeated jobs. It never touches the DB; it calls our API like any client. FastAPI still enforces permissions, rules, tenant.
+
+Workflows:
+- A (new lead): event -> fetch lead via API -> AI assessment -> assign + task -> notify rep.
+- B (follow-up): schedule -> due tasks from API -> check consent, opt-out, quiet hours, status, replies -> send approved message or request approval -> save result.
+- C (customer reply): save message -> pause follow-ups -> re-run intent -> notify rep -> new task if needed.
+
+Rules:
+- n8n editor is private; customers never access/edit workflows.
+- FastAPI <-> n8n: authenticated internal requests; no unrestricted DB access.
+- Unique event IDs + idempotency keys prevent duplicate messages/tasks.
+- Safe retries with logging; minimal PII in execution logs; set execution data retention.
+- Stable encryption key stored outside workflow DB; keep n8n updated; TLS via reverse proxy.
+- Licensing: Sustainable Use License may cover workflows we run for clients if they cannot access/change them. Customer-configurable workflows or white-labeling may need a commercial license. Confirm with n8n before launch.
+
+## 16. API CONTRACT
+Auth:
+  POST  /api/v1/auth/signup | /login | /refresh | /logout | /password-reset
+Invitations/users/teams:
+  POST  /api/v1/invitations
+  POST  /api/v1/invitations/{token}/accept
+  GET   /api/v1/users            PATCH /api/v1/users/{id}
+  GET   /api/v1/teams            POST  /api/v1/teams
+Leads:
+  POST  /api/v1/leads            GET   /api/v1/leads
+  GET   /api/v1/leads/{id}       PATCH /api/v1/leads/{id}
+  POST  /api/v1/leads/{id}/assign
+  POST  /api/v1/leads/import
+  GET   /api/v1/leads/{id}/timeline
+  GET   /api/v1/leads/{id}/assessments
+Conversations/tasks:
+  GET   /api/v1/conversations    POST  /api/v1/messages
+  POST  /api/v1/tasks            GET   /api/v1/tasks
+  PATCH /api/v1/tasks/{id}       GET   /api/v1/tasks/due-follow-ups
+Dashboard:
+  GET   /api/v1/dashboard/summary?scope=me|team|company
+Integrations/webhooks/public:
+  POST  /api/v1/integrations/{provider}/connect
+  POST  /api/v1/webhooks/{provider}
+  POST  /api/v1/public/forms/{form_id}/submit
+Internal (n8n only, service auth):
+  POST  /internal/v1/automation/*
+
+Per integration store: owner, provider account ID, scopes, expiry, encrypted credentials.
+
+## 17. DASHBOARDS
+All queries filtered by tenant AND role, server-side.
+- Sales rep: my new leads; my high-priority leads; follow-ups due today; overdue tasks; recent conversations; my conversion rate.
+- Sales manager: leads by source; leads per rep; avg first-response time; follow-up completion rate; conversion by rep; pipeline stages + lost reasons.
+- Company admin: overall sales performance; team + rep performance; lead-source performance; integration health; automation success/failure; users + roles.
+
+## 18. SECURITY REQUIREMENTS [SEC]
+Everything here is required for MVP.
+
+Authentication: email verification, Argon2id, MFA for admins, single-use short-lived reset tokens, short-lived access tokens, refresh rotation + revocation, login rate limits, invite-only joining.
+
+Risk -> protection:
+- Cross-company leakage -> tenant verification, RLS, authorization tests
+- Password attacks -> Argon2id, MFA, rate limits
+- SQL injection -> parameterized queries / ORM
+- Unauthorized APIs -> server-side auth + permission checks
+- CSRF/XSS -> secure cookies, CSRF tokens, escaping, CSP
+- Webhook spoofing -> provider signature validation
+- Credential theft -> encryption, restricted access, rotation
+- API abuse -> tenant-aware rate limits, validation, quotas
+- Server attacks -> firewall, updates, monitoring
+
+Data protection: TLS everywhere, encryption at rest, KMS/secrets manager for tokens, separate DB credentials (app / n8n / admin), no public DB port, encrypted off-server backups, audit logs, retention/export/deletion policy, logged temporary support access.
+
+## 19. PROJECT STRUCTURE
+```
+ai-crm/
+├── frontend/src/{app,components,dashboard,leads,conversations,tasks,settings}
+├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── core/        (config.py, security.py, permissions.py, tenancy.py)
+│   │   ├── modules/     (auth, tenants, users, leads, conversations, tasks,
+│   │   │                 ai, integrations, dashboard, audit)
+│   │   ├── database/
+│   │   └── schemas/
+│   ├── alembic/
+│   ├── tests/           (unit, api, cross_tenant, e2e)
+│   └── requirements.txt
+├── n8n/workflows/
+├── infrastructure/{docker-compose.yml, reverse-proxy/}
+└── README.md
+```
+- Each module has: models.py, schemas.py, service.py, router.py, tests/ (parallel work, fewer merge conflicts).
+- TODO: ARCHITECTURE.md links to SECURITY.md, DATABASE_SCHEMA.md, PRODUCT_REQUIREMENTS.md; these files do not exist yet.
+
+## 20. PRODUCTION-READINESS CHECKLIST
+- [ ] Company A cannot read/update/delete Company B's data
+- [ ] Sales rep cannot access unauthorized team leads
+- [ ] Manager cannot access another company's dashboard
+- [ ] Company admin cannot access platform administration
+- [ ] Duplicate webhooks create no duplicate leads or messages
+- [ ] Follow-ups stop when lead replies or opts out
+- [ ] n8n cannot retrieve unrestricted data from other tenants
+- [ ] Integration credentials encrypted and hidden from ordinary users
+- [ ] Backups restore correctly; tenant data can be securely deleted
+- [ ] Failed workflows logged and safely retryable
+- [ ] Logs contain no passwords, tokens or unnecessary message content
+
+## 21. POST-MVP
+- Next: Instagram, forums, WhatsApp/Meta production approval
+- Then: HubSpot/Salesforce sync, email channel
+- SaaS readiness: billing, quotas, monitoring/alerts, n8n queue mode
+- Scale: dedicated schema/DB for large tenants, self-hosted LLM option
+Priority order: secure tenant isolation -> CRM core -> AI -> automation. If isolation is wrong, nothing else makes this a safe SaaS product.
