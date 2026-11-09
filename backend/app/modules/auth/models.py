@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy.dialects.postgresql import INET, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base, UUIDPkMixin
@@ -32,4 +32,24 @@ class RefreshToken(UUIDPkMixin, Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+class AuthAttempt(UUIDPkMixin, Base):
+    """Global login attempts; intentionally has no tenant_id or tenant RLS."""
+
+    __tablename__ = "auth_attempts"
+
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+    ip_address: Mapped[str | None] = mapped_column(INET, nullable=True)
+    success: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        CheckConstraint("email = lower(email)", name="email_lowercase"),
+        Index("ix_auth_attempts_email_created", "email", "created_at"),
+        Index("ix_auth_attempts_ip_created", "ip_address", "created_at"),
     )
