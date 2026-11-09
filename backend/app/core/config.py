@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
+    refresh_token_expire_days: int = 30
+    cookie_secure: bool = False  # set COOKIE_SECURE=true in staging/production
+    allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
