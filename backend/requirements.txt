@@ -9,3 +9,7 @@ pytest
 httpx
 ruff
 argon2-cffi
+PyJWT
+email-validator
+argon2-cffi
+PyJWT

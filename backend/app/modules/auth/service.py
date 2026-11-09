@@ -1,0 +1,236 @@
+﻿import uuid
+from datetime import UTC, datetime
+
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.security import DUMMY_PASSWORD_HASH, hash_password, verify_password
+from app.database.session import set_tenant_context
+from app.modules.audit.models import AuditLog
+from app.modules.auth import sessions
+from app.modules.auth.errors import AuthError
+from app.modules.auth.rate_limit import (
+    LoginRateLimitExceeded,
+    check_login_rate_limit,
+    record_login_attempt,
+)
+from app.modules.auth.schemas import LoginRequest, SignupRequest
+from app.modules.tenants.models import Tenant, TenantMembership
+from app.modules.users.models import User
+
+
+def signup(session: Session, body: SignupRequest) -> dict:
+    """Create the company and its first admin in ONE transaction. No tokens are issued."""
+
+    if session.scalar(select(User.id).where(User.email == body.email)):
+        raise AuthError(
+            409,
+            "email_exists",
+            "An account with this email already exists",
+        )
+
+    password_hash = hash_password(body.password)
+    tenant_id = uuid.uuid4()
+
+    try:
+        set_tenant_context(session, str(tenant_id))
+
+        user = User(
+            email=body.email,
+            full_name=body.full_name,
+            password_hash=password_hash,
+        )
+        session.add(user)
+        session.flush()
+
+        tenant = Tenant(
+            id=tenant_id,
+            name=body.company_name,
+            slug=body.company_slug,
+        )
+        session.add(tenant)
+        session.flush()
+
+        membership = TenantMembership(
+            tenant_id=tenant_id,
+            user_id=user.id,
+            role="admin",
+        )
+        session.add(membership)
+        session.flush()
+
+        session.add(
+            AuditLog(
+                tenant_id=tenant_id,
+                actor_user_id=user.id,
+                action="auth.signup",
+                entity_type="tenant",
+                entity_id=tenant_id,
+                details={},
+            )
+        )
+        session.flush()
+
+        result = {
+            "tenant": {
+                "id": str(tenant.id),
+                "name": tenant.name,
+                "slug": tenant.slug,
+            },
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "full_name": user.full_name,
+                "email_verified": False,
+            },
+            "membership": {
+                "role": membership.role,
+                "is_active": True,
+            },
+        }
+
+        session.commit()
+
+    except IntegrityError as exc:
+        session.rollback()
+
+        if "slug" in str(exc.orig).lower():
+            raise AuthError(
+                409,
+                "slug_taken",
+                "This company address is already taken",
+            ) from exc
+
+        raise AuthError(
+            409,
+            "email_exists",
+            "An account with this email already exists",
+        ) from exc
+
+    return result
+
+
+def login(
+    session: Session,
+    body: LoginRequest,
+    ip: str | None = None,
+    user_agent: str | None = None,
+) -> tuple[dict, str]:
+    """Apply login limits, verify credentials and start a refresh-token session."""
+
+    email = body.email.strip().lower()
+
+    # Provisional limits; confirm these thresholds with the team before production.
+    window_minutes = 15
+    max_email_failures = 5
+    max_ip_failures = 20
+
+    try:
+        check_login_rate_limit(
+            session,
+            email=email,
+            ip_address=ip,
+            window_minutes=window_minutes,
+            max_email_failures=max_email_failures,
+            max_ip_failures=max_ip_failures,
+        )
+    except LoginRateLimitExceeded as exc:
+        raise AuthError(
+            429,
+            "login_rate_limited",
+            "Too many login attempts. Try again later.",
+        ) from exc
+
+    user = session.scalar(select(User).where(User.email == email))
+
+    if user is None:
+        verify_password(body.password, DUMMY_PASSWORD_HASH)
+        record_login_attempt(
+            session,
+            email=email,
+            ip_address=ip,
+            success=False,
+        )
+        session.commit()
+        raise AuthError(
+            401,
+            "invalid_credentials",
+            "Invalid email or password",
+        )
+
+    if not verify_password(body.password, user.password_hash):
+        record_login_attempt(
+            session,
+            email=email,
+            ip_address=ip,
+            success=False,
+        )
+        session.commit()
+        raise AuthError(
+            401,
+            "invalid_credentials",
+            "Invalid email or password",
+        )
+
+    if not user.is_active:
+        record_login_attempt(
+            session,
+            email=email,
+            ip_address=ip,
+            success=False,
+        )
+        session.commit()
+        raise AuthError(
+            403,
+            "account_disabled",
+            "This account is disabled",
+        )
+
+    if user.email_verified_at is None:
+        record_login_attempt(
+            session,
+            email=email,
+            ip_address=ip,
+            success=False,
+        )
+        session.commit()
+        raise AuthError(
+            403,
+            "email_not_verified",
+            "Verify your email before logging in",
+        )
+
+    user.last_login_at = datetime.now(UTC)
+
+    started = sessions.start_session(
+        session,
+        user.id,
+        ip,
+        user_agent,
+    )
+
+    record_login_attempt(
+        session,
+        email=email,
+        ip_address=ip,
+        success=True,
+    )
+
+    session.commit()
+
+    data = {
+        "access_token": started["access_token"],
+        "token_type": "bearer",
+        "expires_in": settings.access_token_expire_minutes * 60,
+        "csrf_token": started["csrf_token"],
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "full_name": user.full_name,
+            "email_verified": True,
+        },
+    }
+
+    return data, started["refresh_token"]
