@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-
+app.include_router(password_reset_router)
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.service import AuthError
+from app.modules.auth.password_reset import router as password_reset_router
 
 app = FastAPI(title="AI Sales Assistant CRM", version="0.1.0")
 
