@@ -27,7 +27,7 @@ class LeadAssessment(UUIDPkMixin, Base):
 
     __tablename__ = "lead_assessments"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "id"),
+        UniqueConstraint("tenant_id", "id", name="uq_lead_assessments_tenant_id_id"),
         CheckConstraint(
             "category IS NULL OR category IN "
             "('business_customer','individual','partner','spam','unknown')",
