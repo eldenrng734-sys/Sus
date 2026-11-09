@@ -5,3 +5,4 @@ from app.modules.integrations.models import Integration, WebhookEvent  # noqa: F
 from app.modules.leads.models import Contact, Interaction, Lead  # noqa: F401
 from app.modules.tenants.models import Team, Tenant, TenantMembership  # noqa: F401
 from app.modules.users.models import User  # noqa: F401
+from app.modules.auth.models import AuthAttempt
