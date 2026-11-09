@@ -6,27 +6,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import (
-    DUMMY_PASSWORD_HASH,
-    create_access_token,
-    hash_password,
-    verify_password,
-)
+from app.core.security import DUMMY_PASSWORD_HASH, hash_password, verify_password
 from app.database.session import set_tenant_context
 from app.modules.audit.models import AuditLog
+from app.modules.auth import sessions
+from app.modules.auth.errors import AuthError
 from app.modules.auth.schemas import LoginRequest, SignupRequest
 from app.modules.tenants.models import Tenant, TenantMembership
 from app.modules.users.models import User
-
-
-class AuthError(Exception):
-    """An error the API turns into the standard error format."""
-
-    def __init__(self, status_code: int, code: str, message: str) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-        self.code = code
-        self.message = message
 
 
 def signup(session: Session, body: SignupRequest) -> dict:
@@ -38,7 +25,6 @@ def signup(session: Session, body: SignupRequest) -> dict:
     tenant_id = uuid.uuid4()
 
     try:
-        # Tenant context first, so the rows pass RLS once it is switched on.
         set_tenant_context(session, str(tenant_id))
 
         user = User(email=body.email, full_name=body.full_name, password_hash=password_hash)
@@ -64,6 +50,7 @@ def signup(session: Session, body: SignupRequest) -> dict:
             )
         )
         session.flush()
+
         result = {
             "tenant": {"id": str(tenant.id), "name": tenant.name, "slug": tenant.slug},
             "user": {
@@ -84,8 +71,10 @@ def signup(session: Session, body: SignupRequest) -> dict:
     return result
 
 
-def login(session: Session, body: LoginRequest) -> dict:
-    """Check the password and hand out a short-lived access token."""
+def login(
+    session: Session, body: LoginRequest, ip: str | None = None, user_agent: str | None = None
+) -> tuple[dict, str]:
+    """Check the password, start a session. Returns (response data, raw refresh token)."""
     user = session.scalar(select(User).where(User.email == body.email))
 
     if user is None:
@@ -105,14 +94,14 @@ def login(session: Session, body: LoginRequest) -> dict:
     # TODO (Dev 5, Day 3): audit login success/failure through the approved pre-tenant
     # path (auth_attempts table), because there is no tenant context at login.
     user.last_login_at = datetime.now(UTC)
+    started = sessions.start_session(session, user.id, ip, user_agent)
     session.commit()
 
-    # TODO: Dev 3 replaces this temporary session id with a real refresh-token session.
-    token = create_access_token(user.id, uuid.uuid4())
-    return {
-        "access_token": token,
+    data = {
+        "access_token": started["access_token"],
         "token_type": "bearer",
         "expires_in": settings.access_token_expire_minutes * 60,
+        "csrf_token": started["csrf_token"],
         "user": {
             "id": str(user.id),
             "email": user.email,
@@ -120,3 +109,4 @@ def login(session: Session, body: LoginRequest) -> dict:
             "email_verified": True,
         },
     }
+    return data, started["refresh_token"]
