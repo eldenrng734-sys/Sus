@@ -99,6 +99,7 @@ class Task(UUIDPkMixin, TimestampMixin, Base):
             "OR (rejected_by_user_id IS NOT NULL AND rejected_at IS NOT NULL)",
             name="rejected_fields",
         ),
+        UniqueConstraint("tenant_id", "id", name="uq_leads_tenant_id_id"),
         Index(
             "uq_tasks_tenant_idempotency", "tenant_id", "idempotency_key",
             unique=True, postgresql_where=text("idempotency_key IS NOT NULL"),
