@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -67,3 +69,16 @@ def decode_access_token(token: str) -> dict:
     if payload.get("type") != "access":
         raise jwt.InvalidTokenError("wrong token type")
     return payload
+
+
+def generate_refresh_token() -> str:
+    """A long random value. Only its hash is stored in the database."""
+    return secrets.token_urlsafe(48)
+
+
+def hash_refresh_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def generate_csrf_token() -> str:
+    return secrets.token_urlsafe(32)

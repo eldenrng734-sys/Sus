@@ -1,5 +1,4 @@
-
-import uuid
+﻿import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -7,15 +6,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import (
-    DUMMY_PASSWORD_HASH,
-    create_access_token,
-    hash_password,
-    verify_password,
-)
+from app.core.security import DUMMY_PASSWORD_HASH, hash_password, verify_password
 from app.database.session import set_tenant_context
 from app.modules.audit.models import AuditLog
-from app.modules.auth.models import AuthAttempt
+from app.modules.auth import sessions
+from app.modules.auth.errors import AuthError
 from app.modules.auth.rate_limit import (
     LoginRateLimitExceeded,
     check_login_rate_limit,
@@ -24,16 +19,6 @@ from app.modules.auth.rate_limit import (
 from app.modules.auth.schemas import LoginRequest, SignupRequest
 from app.modules.tenants.models import Tenant, TenantMembership
 from app.modules.users.models import User
-
-
-class AuthError(Exception):
-    """An error the API turns into the standard error format."""
-
-    def __init__(self, status_code: int, code: str, message: str) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-        self.code = code
-        self.message = message
 
 
 def signup(session: Session, body: SignupRequest) -> dict:
@@ -50,7 +35,6 @@ def signup(session: Session, body: SignupRequest) -> dict:
     tenant_id = uuid.uuid4()
 
     try:
-        # Tenant context first, so the rows pass RLS once it is switched on.
         set_tenant_context(session, str(tenant_id))
 
         user = User(
@@ -131,23 +115,23 @@ def signup(session: Session, body: SignupRequest) -> dict:
 def login(
     session: Session,
     body: LoginRequest,
-    ip_address: str | None = None,
-) -> dict:
-    """Check login limits, verify credentials and issue an access token."""
+    ip: str | None = None,
+    user_agent: str | None = None,
+) -> tuple[dict, str]:
+    """Apply login limits, verify credentials and start a refresh-token session."""
 
     email = body.email.strip().lower()
 
-    # Provisional limits. Confirm with the team before production.
+    # Provisional limits; confirm these thresholds with the team before production.
     window_minutes = 15
     max_email_failures = 5
     max_ip_failures = 20
 
-    # Check rate limits before verifying credentials.
     try:
         check_login_rate_limit(
             session,
             email=email,
-            ip_address=ip_address,
+            ip_address=ip,
             window_minutes=window_minutes,
             max_email_failures=max_email_failures,
             max_ip_failures=max_ip_failures,
@@ -159,22 +143,17 @@ def login(
             "Too many login attempts. Try again later.",
         ) from exc
 
-    user = session.scalar(
-        select(User).where(User.email == email)
-    )
+    user = session.scalar(select(User).where(User.email == email))
 
     if user is None:
-        # Keep password verification timing similar for unknown emails.
         verify_password(body.password, DUMMY_PASSWORD_HASH)
-
         record_login_attempt(
             session,
             email=email,
-            ip_address=ip_address,
+            ip_address=ip,
             success=False,
         )
         session.commit()
-
         raise AuthError(
             401,
             "invalid_credentials",
@@ -185,11 +164,10 @@ def login(
         record_login_attempt(
             session,
             email=email,
-            ip_address=ip_address,
+            ip_address=ip,
             success=False,
         )
         session.commit()
-
         raise AuthError(
             401,
             "invalid_credentials",
@@ -200,11 +178,10 @@ def login(
         record_login_attempt(
             session,
             email=email,
-            ip_address=ip_address,
+            ip_address=ip,
             success=False,
         )
         session.commit()
-
         raise AuthError(
             403,
             "account_disabled",
@@ -215,36 +192,39 @@ def login(
         record_login_attempt(
             session,
             email=email,
-            ip_address=ip_address,
+            ip_address=ip,
             success=False,
         )
         session.commit()
-
         raise AuthError(
             403,
             "email_not_verified",
             "Verify your email before logging in",
         )
 
-    # Successful login.
     user.last_login_at = datetime.now(UTC)
+
+    started = sessions.start_session(
+        session,
+        user.id,
+        ip,
+        user_agent,
+    )
 
     record_login_attempt(
         session,
         email=email,
-        ip_address=ip_address,
+        ip_address=ip,
         success=True,
     )
 
     session.commit()
 
-    # Dev 3 will replace this temporary session ID with a real refresh-token session.
-    token = create_access_token(user.id, uuid.uuid4())
-
-    return {
-        "access_token": token,
+    data = {
+        "access_token": started["access_token"],
         "token_type": "bearer",
         "expires_in": settings.access_token_expire_minutes * 60,
+        "csrf_token": started["csrf_token"],
         "user": {
             "id": str(user.id),
             "email": user.email,
@@ -252,3 +232,5 @@ def login(
             "email_verified": True,
         },
     }
+
+    return data, started["refresh_token"]
