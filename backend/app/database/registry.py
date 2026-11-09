@@ -5,5 +5,6 @@ from app.modules.conversations.models import Conversation, Message  # noqa: F401
 from app.modules.integrations.models import Integration, WebhookEvent  # noqa: F401
 from app.modules.leads.models import Contact, Interaction, Lead  # noqa: F401
 from app.modules.tenants.models import Team, Tenant, TenantMembership  # noqa: F401
-from app.modules.users.models import User  # noqa: F401
+from app.modules.users.models import User  # noqa: F401 HEAD
 from app.modules.auth import models as _auth_models  # noqa: F401
+from app.modules.auth.models import AuthAttempt  # noqa: F401

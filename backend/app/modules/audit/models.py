@@ -1,7 +1,16 @@
+
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, func, text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,11 +28,17 @@ class AuditLog(UUIDPkMixin, Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
     )
+    actor_type: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        server_default=text("'user'"),
+    )
     action: Mapped[str] = mapped_column(String(100), nullable=False)
     entity_type: Mapped[str | None] = mapped_column(String(60))
     entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     ip_address: Mapped[str | None] = mapped_column(String(45))
     user_agent: Mapped[str | None] = mapped_column(String(300))
+    request_id: Mapped[str | None] = mapped_column(String(100))
     details: Mapped[dict] = mapped_column(
         JSONB,
         nullable=False,
@@ -36,6 +51,10 @@ class AuditLog(UUIDPkMixin, Base):
     )
 
     __table_args__ = (
+        CheckConstraint(
+            "actor_type IN ('user', 'system', 'automation', 'platform_admin')",
+            name="valid_actor_type",
+        ),
         Index("ix_audit_logs_tenant_created", "tenant_id", "created_at"),
         Index("ix_audit_logs_actor_user_id", "actor_user_id"),
     )
