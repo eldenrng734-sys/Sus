@@ -290,7 +290,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], name=op.f('fk_messages_tenant_id_tenants'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_messages')),
     sa.UniqueConstraint('tenant_id', 'id', name=op.f('uq_messages_tenant_id')),
-    sa.UniqueConstraint('tenant_id', 'provider', 'provider_message_id', name=op.f('uq_messages_tenant_id'))
+    sa.UniqueConstraint('tenant_id', 'provider', 'provider_message_id', name=op.f('uq_messages_tenant_provider_message'))
     )
     op.create_index('ix_messages_tenant_conversation_created', 'messages', ['tenant_id', 'conversation_id', 'created_at'], unique=False)
     # ### end Alembic commands ###
