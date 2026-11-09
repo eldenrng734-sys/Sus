@@ -23,7 +23,8 @@ class Invitation(UUIDPkMixin, TimestampMixin, Base):
     )
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False)
-    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)  # Store hash only, never the raw token.
+            # Store hash only, never the raw token.
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="pending")
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
