@@ -23,7 +23,7 @@ class Conversation(UUIDPkMixin, TimestampMixin, Base):
 
     __tablename__ = "conversations"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "id"),
+        UniqueConstraint("tenant_id", "id", name="uq_conversations_tenant_id_id"),
         CheckConstraint("channel IN ('whatsapp','messenger','email','web')", name="channel"),
         CheckConstraint("status IN ('open','pending','closed')", name="status"),
         # A member of the SAME tenant only
@@ -74,8 +74,13 @@ class Message(UUIDPkMixin, TimestampMixin, Base):
 
     __tablename__ = "messages"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "id"),
-        UniqueConstraint("tenant_id", "provider", "provider_message_id"),
+        UniqueConstraint("tenant_id", "id", name="uq_messages_tenant_id_id"),
+        UniqueConstraint(
+            "tenant_id",
+            "provider",
+            "provider_message_id",
+            name="uq_messages_tenant_provider_message_id",
+        ),
         CheckConstraint("provider IN ('whatsapp','messenger')", name="provider"),
         CheckConstraint("direction IN ('inbound','outbound')", name="direction"),
         CheckConstraint(
