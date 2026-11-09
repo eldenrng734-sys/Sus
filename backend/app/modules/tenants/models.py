@@ -20,9 +20,7 @@ class Tenant(UUIDPkMixin, TimestampMixin, Base):
 
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     slug: Mapped[str] = mapped_column(String(63), nullable=False, unique=True)
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, server_default="active"
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="active")
 
     __table_args__ = (
         CheckConstraint(
@@ -67,9 +65,7 @@ class TenantMembership(UUIDPkMixin, TimestampMixin, Base):
         nullable=True,
     )
     role: Mapped[str] = mapped_column(String(20), nullable=False)
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true"
-    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
 
     __table_args__ = (
         CheckConstraint(
