@@ -20,6 +20,7 @@ services:
     environment:
       APP_ENV: ${APP_ENV}
       DATABASE_URL: ${DATABASE_URL}
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       WATCHFILES_FORCE_POLLING: "true"
     ports:

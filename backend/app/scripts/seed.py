@@ -49,7 +49,7 @@ def main() -> None:
 
     dev_password = os.environ.get("SEED_PASSWORD", "ChangeMe!12345")  # dev only
     hasher = PasswordHasher()  # Argon2id
-    engine = create_engine(settings.database_url)
+    engine = create_engine(settings.migration_database_url or settings.database_url)
 
     for c in COMPANIES:
         # One transaction per company.
@@ -99,7 +99,7 @@ def main() -> None:
                 )
             print(f"seeded {c['slug']}: {len(TEAM_NAMES)} teams, {len(PEOPLE)} users")
 
-       print(
+    print(
         "done. Dev login password is set by SEED_PASSWORD "
         "(default in this file); never use it in production."
     )
