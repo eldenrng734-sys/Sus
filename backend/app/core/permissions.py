@@ -1,4 +1,4 @@
-﻿"""Role-based access control dependencies."""
+"""Role-based access control dependencies."""
 
 from typing import Callable
 

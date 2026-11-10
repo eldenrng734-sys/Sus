@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import select

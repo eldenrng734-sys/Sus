@@ -5,22 +5,27 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+# -----------------------------------------------------------------
+from app.core.config import settings
+from app.core.security import hash_password
+
 # ---- ADAPT THESE THREE IMPORTS to the names found in Step 1 ----
 from app.database.session import get_db
-from app.core.security import hash_password
-from app.modules.auth.models import RefreshToken
-# -----------------------------------------------------------------
-
-from app.core.config import settings
 from app.modules.auth import tokens
 from app.modules.auth.emails import send_password_reset_email, send_verification_email
+from app.modules.auth.models import RefreshToken
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 RESET_REQUESTED = {"data": {"message": "If the account exists, a reset email has been sent."}}
-VERIFY_REQUESTED = {"data": {"message": "If the account exists and is unverified, an email has been sent."}}
-INVALID_TOKEN = {"code": "invalid_or_expired_token", "message": "This link is invalid or has expired."}
+VERIFY_REQUESTED = {
+    "data": {"message": "If the account exists and is unverified, an email has been sent."}
+}
+INVALID_TOKEN = {
+    "code": "invalid_or_expired_token",
+    "message": "This link is invalid or has expired.",
+}
 
 
 class EmailBody(BaseModel):
