@@ -27,3 +27,15 @@ Thumbs.db
 htmlcov/
 dist/
 build/
+
+
+.venv/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+.ruff_cache/
+node_modules/
+.next/
+pgdata/
+.DS_Store
