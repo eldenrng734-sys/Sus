@@ -34,3 +34,13 @@ class LoginRequest(BaseModel):
     @classmethod
     def lower_email(cls, value: str) -> str:
         return value.strip().lower()
+
+
+class MfaChallengeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    challenge: str = Field(min_length=32, max_length=128)
+
+
+class MfaCodeRequest(MfaChallengeRequest):
+    code: str = Field(min_length=6, max_length=32)
