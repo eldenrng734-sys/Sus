@@ -1,8 +1,9 @@
-﻿"""Role-based access control dependencies."""
+"""Role-based access control dependencies."""
 
 from typing import Callable
 
 from fastapi import Depends
+from sqlalchemy import false
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import TenantContext, get_tenant_context
@@ -42,8 +43,6 @@ def require_platform_admin(
 require_admin = require_roles("admin")
 require_manager_or_admin = require_roles("manager", "admin")
 require_any_member = require_roles("rep", "manager", "admin")
-
-from sqlalchemy import false
 
 
 def apply_data_scope(statement, model, context: TenantContext):
