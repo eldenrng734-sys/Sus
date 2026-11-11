@@ -1,4 +1,4 @@
-﻿"""Add auth attempts, refresh tokens and audit fields."""
+"""Add auth attempts, refresh tokens and audit fields."""
 
 from alembic import op
 import sqlalchemy as sa

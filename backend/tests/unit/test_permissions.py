@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 
 import pytest
 from sqlalchemy import select
@@ -23,9 +23,7 @@ def make_context(role, team_id=None):
 
 
 def compile_query(statement):
-    return statement.compile(
-        dialect=postgresql.dialect()
-    )
+    return statement.compile(dialect=postgresql.dialect())
 
 
 def test_rep_scope_is_own_assigned_leads():

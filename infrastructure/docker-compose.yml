@@ -27,6 +27,7 @@ services:
       APP_ENV: ${APP_ENV}
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
       WATCHFILES_FORCE_POLLING:SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       MAIL_FROM: no-reply@crm.local

@@ -2,8 +2,15 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, DateTime, ForeignKeyConstraint, Index, Integer,
-    Text, UniqueConstraint, text,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    Text,
+    UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -40,35 +47,45 @@ class Task(UUIDPkMixin, TimestampMixin, Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_by: Mapped[str] = mapped_column(Text, nullable=False, server_default="user")
     idempotency_key: Mapped[str | None] = mapped_column(Text)
-    version: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("1")
-    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "id", name="uq_tasks_tenant_id_id"),
         ForeignKeyConstraint(
-            ["tenant_id"], ["tenants.id"],
-            name="fk_tasks_tenant_id_tenants", ondelete="RESTRICT",
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_tasks_tenant_id_tenants",
+            ondelete="RESTRICT",
         ),
         ForeignKeyConstraint(
-            ["tenant_id", "lead_id"], ["leads.tenant_id", "leads.id"],
-            name="fk_tasks_lead_leads", ondelete="RESTRICT",
+            ["tenant_id", "lead_id"],
+            ["leads.tenant_id", "leads.id"],
+            name="fk_tasks_lead_leads",
+            ondelete="RESTRICT",
         ),
         ForeignKeyConstraint(
-            ["tenant_id", "assigned_user_id"], MEMBERSHIP_COLS,
-            name="fk_tasks_assigned_user_tenant_memberships", ondelete="RESTRICT",
+            ["tenant_id", "assigned_user_id"],
+            MEMBERSHIP_COLS,
+            name="fk_tasks_assigned_user_tenant_memberships",
+            ondelete="RESTRICT",
         ),
         ForeignKeyConstraint(
-            ["tenant_id", "approved_by_user_id"], MEMBERSHIP_COLS,
-            name="fk_tasks_approved_by_tenant_memberships", ondelete="RESTRICT",
+            ["tenant_id", "approved_by_user_id"],
+            MEMBERSHIP_COLS,
+            name="fk_tasks_approved_by_tenant_memberships",
+            ondelete="RESTRICT",
         ),
         ForeignKeyConstraint(
-            ["tenant_id", "rejected_by_user_id"], MEMBERSHIP_COLS,
-            name="fk_tasks_rejected_by_tenant_memberships", ondelete="RESTRICT",
+            ["tenant_id", "rejected_by_user_id"],
+            MEMBERSHIP_COLS,
+            name="fk_tasks_rejected_by_tenant_memberships",
+            ondelete="RESTRICT",
         ),
         ForeignKeyConstraint(
-            ["tenant_id", "team_id"], ["teams.tenant_id", "teams.id"],
-            name="fk_tasks_team_teams", ondelete="RESTRICT",
+            ["tenant_id", "team_id"],
+            ["teams.tenant_id", "teams.id"],
+            name="fk_tasks_team_teams",
+            ondelete="RESTRICT",
         ),
         CheckConstraint("type IN ('call','meeting','reminder','follow_up')", name="type"),
         CheckConstraint("status IN ('open','done','cancelled','paused')", name="status"),
@@ -77,9 +94,7 @@ class Task(UUIDPkMixin, TimestampMixin, Base):
             name="approval_status",
         ),
         CheckConstraint("created_by IN ('user','system','automation')", name="created_by"),
-        CheckConstraint(
-            "(status = 'done') = (completed_at IS NOT NULL)", name="done_completed_at"
-        ),
+        CheckConstraint("(status = 'done') = (completed_at IS NOT NULL)", name="done_completed_at"),
         CheckConstraint(
             "(requires_approval = false AND approval_status = 'not_required') "
             "OR (requires_approval = true "
@@ -98,12 +113,17 @@ class Task(UUIDPkMixin, TimestampMixin, Base):
         ),
         UniqueConstraint("tenant_id", "id", name="uq_leads_tenant_id_id"),
         Index(
-            "uq_tasks_tenant_idempotency", "tenant_id", "idempotency_key",
-            unique=True, postgresql_where=text("idempotency_key IS NOT NULL"),
+            "uq_tasks_tenant_idempotency",
+            "tenant_id",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=text("idempotency_key IS NOT NULL"),
         ),
         Index(
             "ix_tasks_tenant_assignee_due_open",
-            "tenant_id", "assigned_user_id", "due_at",
+            "tenant_id",
+            "assigned_user_id",
+            "due_at",
             postgresql_where=text("status = 'open'"),
         ),
         Index("ix_tasks_tenant_status_due", "tenant_id", "status", "due_at"),
