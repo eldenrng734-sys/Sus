@@ -419,6 +419,7 @@ Rules:
 ## 16. API CONTRACT
 Auth:
   POST  /api/v1/auth/signup | /login | /refresh | /logout | /password-reset
+  POST  /api/v1/auth/mfa/enrollment/start | /enrollment/confirm | /verify
 Invitations/users/teams:
   POST  /api/v1/invitations
   POST  /api/v1/invitations/{token}/accept
@@ -456,6 +457,7 @@ All queries filtered by tenant AND role, server-side.
 Everything here is required for MVP.
 
 Authentication: email verification, Argon2id, MFA for admins, single-use short-lived reset tokens, short-lived access tokens, refresh rotation + revocation, login rate limits, invite-only joining.
+MFA TOTP secrets are encrypted with a dedicated `MFA_ENCRYPTION_KEY` (generate with `Fernet.generate_key()`); keep the key stable and outside source control. Admin login does not issue a session until MFA enrollment or verification succeeds.
 
 Risk -> protection:
 - Cross-company leakage -> tenant verification, RLS, authorization tests
