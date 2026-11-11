@@ -6,9 +6,14 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.database.session import get_session
-from app.modules.auth import service, sessions
+from app.modules.auth import mfa, service, sessions
 from app.modules.auth.errors import AuthError
-from app.modules.auth.schemas import LoginRequest, SignupRequest
+from app.modules.auth.schemas import (
+    LoginRequest,
+    MfaChallengeRequest,
+    MfaCodeRequest,
+    SignupRequest,
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -74,6 +79,53 @@ def login(
 ) -> dict:
     ip, ua = _client_info(request)
     data, refresh_token = service.login(session, body, ip, ua)
+    if refresh_token is not None:
+        _set_cookies(response, refresh_token, data["csrf_token"])
+    return {"data": data}
+
+
+@router.post("/mfa/setup")
+def start_mfa_enrollment(
+    body: MfaChallengeRequest,
+    session: Session = Depends(get_session),
+) -> dict:
+    return {"data": mfa.start_enrollment(session, body.challenge)}
+
+
+@router.post("/mfa/confirm")
+def confirm_mfa_enrollment(
+    body: MfaCodeRequest,
+    request: Request,
+    response: Response,
+    session: Session = Depends(get_session),
+) -> dict:
+    ip, ua = _client_info(request)
+    data, refresh_token = mfa.confirm_enrollment(
+        session,
+        body.challenge,
+        body.code,
+        ip,
+        ua,
+    )
+    _set_cookies(response, refresh_token, data["csrf_token"])
+    return {"data": data}
+
+
+@router.post("/mfa/verify")
+def verify_mfa(
+    body: MfaCodeRequest,
+    request: Request,
+    response: Response,
+    session: Session = Depends(get_session),
+) -> dict:
+    ip, ua = _client_info(request)
+    data, refresh_token = mfa.verify_login(
+        session,
+        body.challenge,
+        body.code,
+        ip,
+        ua,
+    )
     _set_cookies(response, refresh_token, data["csrf_token"])
     return {"data": data}
 
