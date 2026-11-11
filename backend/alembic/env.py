@@ -11,9 +11,6 @@ from app.database.base import Base
 # access to the values within the .ini file in use.
 config = context.config
 config.set_main_option(
-    "sqlalchemy.url",(settings.migration_database_url or settings.database_url).replace("%", "%%"),
-)
-config.set_main_option(
     "sqlalchemy.url",
     (settings.migration_database_url or settings.database_url).replace("%", "%%"),
 )
