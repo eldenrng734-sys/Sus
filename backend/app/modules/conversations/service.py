@@ -131,9 +131,7 @@ def list_messages(
     return [MessageOut.model_validate(m) for m in session.scalars(stmt)]
 
 
-def send_message(
-    session: Session, context: TenantContext, body: MessageCreate
-) -> MessageOut:
+def send_message(session: Session, context: TenantContext, body: MessageCreate) -> MessageOut:
     """Store an outbound message as 'queued'. Real sending is added on Day 7."""
     conversation = _get_conversation(session, context, body.conversation_id)
     if conversation.channel not in MESSAGE_CHANNELS:
