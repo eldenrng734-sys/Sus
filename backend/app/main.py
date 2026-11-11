@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from app.modules.auth.errors import AuthError
 from app.modules.auth.router import router as auth_router
+from app.modules.teams.router import router as teams_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api.request")
@@ -75,6 +76,7 @@ def health() -> dict[str, str]:
 
 
 app.include_router(auth_router)
+app.include_router(teams_router)
 
 
 @app.exception_handler(AuthError)
