@@ -42,7 +42,7 @@ def admin_engine() -> Iterator[Engine]:
     if url is None:
         pytest.skip("No test database configured (set TEST_DATABASE_URL or POSTGRES_* in .env)")
     assert_is_test_database(url)
-    engine = create_engine(url, pool_pre_ping=True)
+    engine = create_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 5})
     try:
         with engine.connect() as conn:
             rows = conn.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'"))
@@ -63,7 +63,7 @@ def app_engine(admin_engine: Engine) -> Iterator[Engine]:
     if url is None:
         pytest.skip("Set TEST_APP_DATABASE_URL (the non-owner crm_app role) to run RLS tests")
     assert_is_test_database(url)
-    engine = create_engine(url, pool_pre_ping=True)
+    engine = create_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 5})
     yield engine
     engine.dispose()
 
