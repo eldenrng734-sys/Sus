@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str = ""
+    migration_database_url: str = ""
     smtp_host: str = "mailpit"
     password_reset_ttl_minutes: int = 30
     email_verification_ttl_hours: int = 24
