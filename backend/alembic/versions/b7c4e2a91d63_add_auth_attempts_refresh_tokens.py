@@ -1,9 +1,9 @@
 """Add auth attempts, refresh tokens and audit fields."""
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
 
 revision = "b7c4e2a91d63"
 down_revision = "f9f7fcdf9d79"

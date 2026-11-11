@@ -8,9 +8,10 @@ Create Date: 2026-11-09 04:32:21.521762
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "f9f7fcdf9d79"
@@ -540,15 +541,18 @@ def upgrade() -> None:
         ),
         sa.Column("id", sa.UUID(), server_default=sa.text("gen_random_uuid()"), nullable=False),
         sa.CheckConstraint(
-            "buying_stage IS NULL OR buying_stage IN ('awareness','consideration','decision','unknown')",
+            "buying_stage IS NULL OR buying_stage IN "
+            "('awareness','consideration','decision','unknown')",
             name=op.f("ck_lead_assessments_buying_stage"),
         ),
         sa.CheckConstraint(
-            "category IS NULL OR category IN ('business_customer','individual','partner','spam','unknown')",
+            "category IS NULL OR category IN "
+            "('business_customer','individual','partner','spam','unknown')",
             name=op.f("ck_lead_assessments_category"),
         ),
         sa.CheckConstraint(
-            "intent IS NULL OR intent IN ('request_demo','pricing','support','info','complaint','other','unknown')",
+            "intent IS NULL OR intent IN "
+            "('request_demo','pricing','support','info','complaint','other','unknown')",
             name=op.f("ck_lead_assessments_intent"),
         ),
         sa.CheckConstraint(
@@ -560,7 +564,8 @@ def upgrade() -> None:
             name=op.f("ck_lead_assessments_priority"),
         ),
         sa.CheckConstraint(
-            "recommended_action IS NULL OR recommended_action IN ('call','schedule_demo','email','follow_up','support','none')",
+            "recommended_action IS NULL OR recommended_action IN "
+            "('call','schedule_demo','email','follow_up','support','none')",
             name=op.f("ck_lead_assessments_recommended_action"),
         ),
         sa.CheckConstraint(
@@ -568,7 +573,8 @@ def upgrade() -> None:
             name=op.f("ck_lead_assessments_review_status"),
         ),
         sa.CheckConstraint(
-            "review_status NOT IN ('approved','rejected') OR (reviewed_by_user_id IS NOT NULL AND reviewed_at IS NOT NULL)",
+            "review_status NOT IN ('approved','rejected') OR "
+            "(reviewed_by_user_id IS NOT NULL AND reviewed_at IS NOT NULL)",
             name=op.f("ck_lead_assessments_reviewed_has_reviewer"),
         ),
         sa.CheckConstraint(

@@ -63,9 +63,7 @@ def test_totp_code_is_accepted_once_only():
     assert mfa._match_totp_step(secret, code, accepted_step) is None
 
 
-def test_admin_password_login_returns_enrollment_challenge_without_session(
-    monkeypatch, fernet_key
-):
+def test_admin_password_login_returns_enrollment_challenge_without_session(monkeypatch, fernet_key):
     user = _user()
     db = MagicMock()
     db.scalar.return_value = user
@@ -127,9 +125,7 @@ def test_admin_access_requires_totp_assurance(monkeypatch):
     ("mfa_verified", "expected_amr"),
     [(False, ["pwd"]), (True, ["pwd", "totp"])],
 )
-def test_started_refresh_session_preserves_mfa_assurance(
-    monkeypatch, mfa_verified, expected_amr
-):
+def test_started_refresh_session_preserves_mfa_assurance(monkeypatch, mfa_verified, expected_amr):
     db = MagicMock()
     monkeypatch.setattr(sessions, "create_access_token", lambda user_id, sid, amr: amr)
     monkeypatch.setattr(sessions, "generate_csrf_token", lambda: "csrf")

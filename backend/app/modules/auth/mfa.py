@@ -85,8 +85,7 @@ def issue_challenge(session: Session, user_id: uuid.UUID, purpose: str) -> str:
     now = datetime.now(UTC)
     session.execute(
         delete(MfaLoginChallenge).where(
-            (MfaLoginChallenge.used_at.is_not(None))
-            | (MfaLoginChallenge.expires_at <= now)
+            (MfaLoginChallenge.used_at.is_not(None)) | (MfaLoginChallenge.expires_at <= now)
         )
     )
     raw_token = secrets.token_urlsafe(32)
@@ -119,9 +118,7 @@ def _load_challenge(
     ):
         raise _invalid_challenge()
 
-    user = session.scalar(
-        select(User).where(User.id == challenge.user_id).with_for_update()
-    )
+    user = session.scalar(select(User).where(User.id == challenge.user_id).with_for_update())
     if user is None or not user.is_active:
         raise _invalid_challenge()
     return challenge, user
