@@ -1,0 +1,22 @@
+name: Deploy staging (manual)
+on:
+  workflow_dispatch:
+
+concurrency: deploy-staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        env:
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
+          HOST: ${{ secrets.STAGING_HOST }}
+          USER_NAME: ${{ secrets.STAGING_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh "$USER_NAME@$HOST" "cd /opt/crm/Sus && ./infrastructure/deploy-staging.sh"
