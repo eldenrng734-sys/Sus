@@ -1,7 +1,18 @@
-import uuid
+﻿import uuid
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+
+
+LeadSource = Literal[
+    "website_form",
+    "tracking",
+    "whatsapp",
+    "facebook_lead_ads",
+    "messenger",
+    "manual",
+    "csv",
+]
 
 
 class LeadAssignRequest(BaseModel):
@@ -23,6 +34,9 @@ class LeadCreate(BaseModel):
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=32)
     company_name: str | None = Field(default=None, max_length=200)
+    source: LeadSource = "manual"
+    source_campaign: str | None = Field(default=None, max_length=200)
+    external_id: str | None = Field(default=None, max_length=255)
     consent: bool = False
     notes: str | None = Field(default=None, max_length=2000)
 
@@ -35,6 +49,11 @@ class LeadCreate(BaseModel):
     @classmethod
     def clean_phone(cls, value):
         return _clean_phone(value)
+
+    @field_validator("source_campaign", "external_id")
+    @classmethod
+    def strip_optional_strings(cls, value):
+        return value.strip() or None if value else None
 
     @model_validator(mode="after")
     def need_contact(self):

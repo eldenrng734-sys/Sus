@@ -66,6 +66,13 @@ def create_lead(session: Session, ctx: TenantContext, body: LeadCreate) -> dict:
         clauses.append(Lead.email == body.email)
     if body.phone:
         clauses.append(Lead.phone == body.phone)
+    if body.external_id:
+        clauses.append(
+            and_(
+                Lead.source == body.source,
+                Lead.external_id == body.external_id,
+            )
+        )
     exists = session.scalar(
         select(Lead.id).where(Lead.tenant_id == ctx.tenant_id, or_(*clauses)).limit(1)
     )
@@ -78,7 +85,9 @@ def create_lead(session: Session, ctx: TenantContext, body: LeadCreate) -> dict:
         email=body.email,
         phone=body.phone,
         company_name=body.company_name,
-        source="manual",
+        source=body.source,
+        source_campaign=body.source_campaign,
+        external_id=body.external_id,
         priority="medium",
         consent=body.consent,
     )
@@ -95,7 +104,7 @@ def create_lead(session: Session, ctx: TenantContext, body: LeadCreate) -> dict:
             tenant_id=ctx.tenant_id,
             lead_id=lead.id,
             type="lead_created",
-            source="manual",
+            source=body.source,
             details={"actor_user_id": str(ctx.user_id)},
         )
     )
