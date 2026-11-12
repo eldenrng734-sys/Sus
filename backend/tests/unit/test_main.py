@@ -6,4 +6,6 @@ def test_auth_routers_are_registered():
 
     assert "/api/v1/auth/login" in paths
     assert "/api/v1/auth/password-reset" in paths
+    assert "/api/v1/conversations" in paths
+    assert "/api/v1/leads/{lead_id}/timeline" in paths
     assert "/health" in paths

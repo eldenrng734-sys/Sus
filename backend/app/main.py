@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from app.modules.auth.errors import AuthError
 from app.modules.auth.password_reset import router as password_reset_router
 from app.modules.auth.router import router as auth_router
+from app.modules.conversations.router import router as conversations_router
 
 app = FastAPI(title="AI Sales Assistant CRM", version="0.1.0")
 
@@ -15,6 +16,7 @@ def health() -> dict[str, str]:
 
 app.include_router(auth_router)
 app.include_router(password_reset_router)
+app.include_router(conversations_router)
 
 
 @app.exception_handler(AuthError)
