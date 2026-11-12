@@ -190,10 +190,17 @@ def get_timeline(
         .limit(fetch)
     ).all()
 
+    interaction_types = {
+        "note": "note_added",
+        "status_change": "status_changed",
+        "assignment": "assigned",
+        "assigned": "assigned",
+        "conversation_started": "integration_event",
+    }
     events = [
         TimelineEvent(
             kind="interaction",
-            type=i.type,
+            type=interaction_types.get(i.type, i.type),
             at=i.occurred_at,
             summary=i.source,
             details=i.details,
@@ -204,7 +211,7 @@ def get_timeline(
         events.append(
             TimelineEvent(
                 kind="message",
-                type=f"message_{message.direction}",
+                type="message_received" if message.direction == "inbound" else "message_sent",
                 at=message.created_at,
                 summary=(message.message_text or "")[:100],
                 details={
