@@ -40,12 +40,3 @@ export async function apiFetch<T>(
   const json = await res.json();
   return (json.data ?? json) as T;
 }
-
-    throw new Error(detail);
-  }
-
-  if (res.status === 204) return undefined as T;
-
-  const json = await res.json();
-  return (json.data ?? json) as T;
-}
