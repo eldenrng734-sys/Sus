@@ -11,8 +11,6 @@ ruff
 argon2-cffi
 PyJWT
 email-validator
-argon2-cffi
-PyJWT
 pyotp
 cryptography
 qrcode[pil]
