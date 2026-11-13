@@ -1,7 +1,7 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
+import { fetchLeads } from "@/lib/leads-api";
 
 type Lead = {
   id: string;
@@ -9,17 +9,10 @@ type Lead = {
   email: string | null;
   phone: string | null;
   company_name: string | null;
+  source: string;
   status: string;
   priority: string;
   created_at: string;
-};
-
-type LeadsResponse = {
-  data: Lead[];
-  meta: {
-    next_cursor: string | null;
-    has_more: boolean;
-  };
 };
 
 const statuses = [
@@ -32,13 +25,31 @@ const statuses = [
 ];
 
 const priorities = ["low", "medium", "high"];
+const sources = [
+  "website_form",
+  "tracking",
+  "whatsapp",
+  "facebook_lead_ads",
+  "messenger",
+  "manual",
+  "csv",
+];
+
+function formatOption(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [priority, setPriority] = useState("");
+  const [source, setSource] = useState("");
+  const [owner, setOwner] = useState("");
   const [cursor, setCursor] = useState<string | null>(null);
+  const [cursorStack, setCursorStack] = useState<(string | null)[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -58,42 +69,16 @@ export default function LeadsPage() {
         if (search.trim()) params.set("q", search.trim());
         if (status) params.set("status", status);
         if (priority) params.set("priority", priority);
+        if (source) params.set("source", source);
+        if (owner) params.set("assigned_user_id", owner);
         if (cursor) params.set("cursor", cursor);
 
-        const token = localStorage.getItem("access_token");
-        const tenantId = localStorage.getItem("tenant_id");
-
-        const response = await fetch(
-          `/api/v1/leads?${params.toString()}`,
-          {
-            headers: {
-              "Content-Type": "application/json",
-              ...(token
-                ? { Authorization: `Bearer ${token}` }
-                : {}),
-              ...(tenantId
-                ? { "X-Tenant-ID": tenantId }
-                : {}),
-            },
-          }
-        );
-
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({}));
-          throw new Error(
-            body?.detail?.[0]?.msg ||
-              body?.detail ||
-              body?.error?.message ||
-              `Request failed (${response.status})`
-          );
-        }
-
-        const result: LeadsResponse = await response.json();
+        const result = await fetchLeads<Lead>(params);
 
         if (!cancelled) {
-          setLeads(result.data ?? []);
-          setNextCursor(result.meta?.next_cursor ?? null);
-          setHasMore(result.meta?.has_more ?? false);
+          setLeads(result.data);
+          setNextCursor(result.meta.next_cursor);
+          setHasMore(result.meta.has_more);
         }
       } catch (err) {
         if (!cancelled) {
@@ -103,6 +88,8 @@ export default function LeadsPage() {
               : "Something went wrong"
           );
           setLeads([]);
+          setNextCursor(null);
+          setHasMore(false);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -113,21 +100,49 @@ export default function LeadsPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [search, status, priority, cursor]);
+  }, [search, status, priority, source, owner, cursor]);
+
+  function resetPagination() {
+    setCursor(null);
+    setCursorStack([]);
+  }
 
   function changeStatus(value: string) {
     setStatus(value);
-    setCursor(null);
+    resetPagination();
   }
 
   function changePriority(value: string) {
     setPriority(value);
-    setCursor(null);
+    resetPagination();
+  }
+
+  function changeSource(value: string) {
+    setSource(value);
+    resetPagination();
+  }
+
+  function changeOwner(value: string) {
+    setOwner(value);
+    resetPagination();
   }
 
   function changeSearch(value: string) {
     setSearch(value);
-    setCursor(null);
+    resetPagination();
+  }
+
+  function goToNextPage() {
+    if (!hasMore || !nextCursor) return;
+    setCursorStack((stack) => [...stack, cursor]);
+    setCursor(nextCursor);
+  }
+
+  function goToPreviousPage() {
+    if (cursorStack.length === 0) return;
+    const previousCursor = cursorStack[cursorStack.length - 1];
+    setCursorStack((stack) => stack.slice(0, -1));
+    setCursor(previousCursor);
   }
 
   return (
@@ -144,7 +159,7 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        <div className="mb-6 grid gap-3 rounded-lg border bg-white p-4 md:grid-cols-3">
+        <div className="mb-6 grid gap-3 rounded-lg border bg-white p-4 md:grid-cols-2 lg:grid-cols-4">
           <input
             type="search"
             placeholder="Search name, email, phone or company..."
@@ -162,7 +177,7 @@ export default function LeadsPage() {
             <option value="">All statuses</option>
             {statuses.map((item) => (
               <option key={item} value={item}>
-                {item.charAt(0).toUpperCase() + item.slice(1)}
+                {formatOption(item)}
               </option>
             ))}
           </select>
@@ -175,10 +190,32 @@ export default function LeadsPage() {
             <option value="">All priorities</option>
             {priorities.map((item) => (
               <option key={item} value={item}>
-                {item.charAt(0).toUpperCase() + item.slice(1)}
+                {formatOption(item)}
               </option>
             ))}
           </select>
+
+          <select
+            value={source}
+            onChange={(e) => changeSource(e.target.value)}
+            className="rounded-md border px-3 py-2 text-sm"
+          >
+            <option value="">All sources</option>
+            {sources.map((item) => (
+              <option key={item} value={item}>
+                {formatOption(item)}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="text"
+            placeholder="Owner user ID (UUID)..."
+            value={owner}
+            onChange={(e) => changeOwner(e.target.value)}
+            maxLength={100}
+            className="rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
 
         {loading && (
@@ -203,6 +240,7 @@ export default function LeadsPage() {
                     <th className="p-4">Company</th>
                     <th className="p-4">Email</th>
                     <th className="p-4">Phone</th>
+                    <th className="p-4">Source</th>
                     <th className="p-4">Status</th>
                     <th className="p-4">Priority</th>
                   </tr>
@@ -224,6 +262,9 @@ export default function LeadsPage() {
                         {lead.phone || "-"}
                       </td>
                       <td className="p-4">
+                        {formatOption(lead.source)}
+                      </td>
+                      <td className="p-4">
                         <span className="rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700">
                           {lead.status}
                         </span>
@@ -239,7 +280,7 @@ export default function LeadsPage() {
                   {leads.length === 0 && (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         className="p-8 text-center text-gray-500"
                       >
                         No leads found.
@@ -255,13 +296,22 @@ export default function LeadsPage() {
                 Showing {leads.length} leads
               </p>
 
-              <button
-                disabled={!hasMore || !nextCursor}
-                onClick={() => setCursor(nextCursor)}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-300"
-              >
-                Next Page
-              </button>
+              <div className="flex gap-2">
+                <button
+                  disabled={cursorStack.length === 0}
+                  onClick={goToPreviousPage}
+                  className="rounded-md bg-gray-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+                >
+                  Previous Page
+                </button>
+                <button
+                  disabled={!hasMore || !nextCursor}
+                  onClick={goToNextPage}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+                >
+                  Next Page
+                </button>
+              </div>
             </div>
           </>
         )}
