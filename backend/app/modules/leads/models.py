@@ -58,6 +58,7 @@ class Lead(UUIDPkMixin, TimestampMixin, Base):
     consent_source: Mapped[str | None] = mapped_column(String(20))
     opted_out: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     opted_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    opted_out_source: Mapped[str | None] = mapped_column(String(50))
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
 
     __table_args__ = (
@@ -98,6 +99,10 @@ class Lead(UUIDPkMixin, TimestampMixin, Base):
         ),
         CheckConstraint("email IS NULL OR email = lower(email)", name="email_lowercase"),
         CheckConstraint("email IS NOT NULL OR phone IS NOT NULL", name="contact_required"),
+        CheckConstraint(
+            "NOT opted_out OR opted_out_at IS NOT NULL",
+            name="opted_out_timestamp_required",
+        ),
         CheckConstraint("version >= 1", name="version_positive"),
         CheckConstraint(
             (
@@ -121,6 +126,30 @@ class Lead(UUIDPkMixin, TimestampMixin, Base):
         Index("ix_leads_tenant_phone", "tenant_id", "phone"),
         Index("ix_leads_tenant_team", "tenant_id", "team_id"),
         Index("ix_leads_tenant_priority", "tenant_id", "priority"),
+    )
+
+
+class AssignmentCursor(UUIDPkMixin, TimestampMixin, Base):
+    __tablename__ = "assignment_cursors"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    team_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    last_assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "team_id", name="uq_assignment_cursors_tenant_team"),
+        ForeignKeyConstraint(
+            ["tenant_id", "team_id"],
+            ["teams.tenant_id", "teams.id"],
+            name="fk_assignment_cursors_team",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "last_assigned_user_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.user_id"],
+            name="fk_assignment_cursors_last_assigned_member",
+            ondelete="RESTRICT",
+        ),
     )
 
 

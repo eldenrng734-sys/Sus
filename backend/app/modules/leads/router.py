@@ -10,7 +10,13 @@ from app.core.tenancy import TenantContext
 from app.database.session import get_session
 from app.modules.auth.errors import AuthError
 from app.modules.leads import crud, service
-from app.modules.leads.schemas import LeadAssignRequest, LeadCreate, LeadUpdate, NoteCreate
+from app.modules.leads.schemas import (
+    LeadAssignRequest,
+    LeadAutoAssignRequest,
+    LeadCreate,
+    LeadUpdate,
+    NoteCreate,
+)
 
 router = APIRouter(prefix="/api/v1/leads", tags=["leads"])
 
@@ -133,3 +139,20 @@ def post_assign_lead(
     session: Session = Depends(get_session),
 ) -> dict:
     return {"data": service.assign_lead(session, context, lead_id, body)}
+
+
+@router.post("/{lead_id}/auto-assign")
+def post_auto_assign_lead(
+    lead_id: uuid.UUID,
+    context: Annotated[TenantContext, Depends(require_manager_or_admin)],
+    session: Session = Depends(get_session),
+    body: LeadAutoAssignRequest | None = None,
+) -> dict:
+    return {
+        "data": service.auto_assign_lead(
+            session,
+            context,
+            lead_id,
+            body.team_id if body else None,
+        )
+    }
