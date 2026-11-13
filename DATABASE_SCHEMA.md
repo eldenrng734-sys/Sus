@@ -118,6 +118,7 @@ erDiagram
 | `mfa_recovery_codes` | `auth` | Hashed one-time MFA recovery codes | Special (global) |
 | `auth_attempts` 🔶 | `auth` | Login rate limiting and audit | Special (global) |
 | `leads` | `leads` | Lead details, source, status, owner, score | ✅ |
+| `assignment_cursors` | `leads` | Team-scoped round-robin assignment position | ✅ |
 | `contacts` ✅ | `leads` | Customer record after conversion | ✅ |
 | `interactions` | `leads` | Notes, calls, form submits, timeline events | ✅ |
 | `lead_forms` 🔶 | `integrations` | Public website form definitions | ✅ |
@@ -372,6 +373,7 @@ Core fields from the guide plus the fields required by the API contract.
 | `consent_source` | text | 🔶 `web_form`, `whatsapp`, `manual`, `import`, `api` |
 | `opted_out` | boolean NOT NULL DEFAULT false | Blocks outbound messages |
 | `opted_out_at` | timestamptz | 🔶 |
+| `opted_out_source` | text | Channel or actor that recorded the opt-out |
 | `version` | integer NOT NULL DEFAULT 1 | Optimistic concurrency |
 | `created_at` / `updated_at` | timestamptz | |
 
@@ -386,6 +388,7 @@ CHECK (lost_reason IS NULL OR lost_reason IN ('price','timing','no_response','co
 CHECK (priority IN ('low','medium','high')),
 CHECK (intent IS NULL OR intent IN ('request_demo','pricing','support','info','complaint','other','unknown')),
 CHECK (consent_source IS NULL OR consent_source IN ('web_form','whatsapp','manual','import','api')),
+CHECK (NOT opted_out OR opted_out_at IS NOT NULL),
 CHECK (lead_score IS NULL OR lead_score BETWEEN 0 AND 100),
 CHECK (email IS NOT NULL OR phone IS NOT NULL),
 CHECK (email IS NULL OR email = lower(email))
@@ -498,6 +501,20 @@ CREATE UNIQUE INDEX tasks_tenant_idempotency_uq
 ```
 
 `approval_status` is stored for filtering and the API response. The service must keep it consistent with `requires_approval` and the reviewer fields when approving or rejecting. Approval does **not** bypass consent, opt-out, quiet hours, or lead-status checks. Those rules stay in the workflow/API layer.
+
+### `assignment_cursors`
+
+Stores the last assigned member for each tenant team so round-robin assignment can advance transactionally.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | uuid PK | |
+| `tenant_id` | uuid NOT NULL | |
+| `team_id` | uuid NOT NULL | Composite FK → `teams` |
+| `last_assigned_user_id` | uuid | Composite FK → tenant membership; null before the first assignment |
+| `created_at` / `updated_at` | timestamptz | |
+
+Constraints: `UNIQUE (tenant_id, team_id)`; RLS restricts all operations to the active tenant.
 
 ### `lead_forms` 🔶
 
@@ -1102,7 +1119,7 @@ If the setting is unset or empty, `NULLIF` returns `NULL`, the comparison is nev
 
 ### Tenant tables that need this policy
 
-`tenant_memberships`, `teams`, `invitations`, `leads`, `contacts`, `interactions`, `lead_forms`, `conversations`, `conversation_reads`, `messages`, `message_attachments`, `lead_assessments`, `tasks`, `integrations`, `webhook_events`, `import_jobs`, `outbox_events`, `idempotency_keys`, `audit_logs`, and `support_access_grants`. Any new table with `tenant_id` joins this list unless it has an entry in **Special cases** below.
+`tenant_memberships`, `teams`, `invitations`, `leads`, `assignment_cursors`, `contacts`, `interactions`, `lead_forms`, `conversations`, `conversation_reads`, `messages`, `message_attachments`, `lead_assessments`, `tasks`, `integrations`, `webhook_events`, `import_jobs`, `outbox_events`, `idempotency_keys`, `audit_logs`, and `support_access_grants`. Any new table with `tenant_id` joins this list unless it has an entry in **Special cases** below.
 
 ### Special cases ⚠️
 
