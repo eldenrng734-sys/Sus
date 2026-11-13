@@ -1,7 +1,6 @@
 from app.modules.ai.models import LeadAssessment  # noqa: F401
 from app.modules.audit.models import AuditLog  # noqa: F401
 from app.modules.auth import models as _auth_models  # noqa: F401
-from app.modules.auth.models import RefreshToken  # noqa: F401
 from app.modules.auth.models import AuthAttempt, RefreshToken  # noqa: F401
 from app.modules.conversations.models import Conversation, Message  # noqa: F401
 from app.modules.idempotency.models import IdempotencyKey  # noqa: F401
