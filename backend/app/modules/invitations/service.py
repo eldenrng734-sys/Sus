@@ -127,6 +127,7 @@ def accept_invitation(session: Session, body: AcceptRequest) -> dict:
         "role": membership.role,
     }
 
+
 def _get_member(session: Session, admin: TenantMembership, membership_id: uuid.UUID):
     member = session.scalars(
         select(TenantMembership).where(

@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.core.security import DUMMY_PASSWORD_HASH, hash_password, verify_password
 from app.database.session import set_tenant_context
 from app.modules.audit.models import AuditLog
-from app.modules.auth import sessions
+from app.modules.auth import mfa, sessions
 from app.modules.auth.errors import AuthError
 from app.modules.auth.rate_limit import (
     LoginRateLimitExceeded,
@@ -161,7 +161,7 @@ def login(
     body: LoginRequest,
     ip: str | None = None,
     user_agent: str | None = None,
-) -> tuple[dict, str]:
+) -> tuple[dict, str | None]:
     """Apply login limits, verify credentials and start a refresh-token session."""
 
     email = body.email.strip().lower()
@@ -245,6 +245,25 @@ def login(
             "email_not_verified",
             "Verify your email before logging in",
         )
+
+    if user.mfa_enabled or mfa.is_admin_user(session, user):
+        purpose = "login" if user.mfa_enabled else "enrollment"
+        if purpose == "enrollment":
+            mfa.validate_encryption_key()
+        challenge = mfa.issue_challenge(session, user.id, purpose)
+        record_login_attempt(session, email=email, ip_address=ip, success=True)
+        session.commit()
+        return {
+            "mfa_required": purpose == "login",
+            "mfa_setup_required": purpose == "enrollment",
+            "challenge": challenge,
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "full_name": user.full_name,
+                "email_verified": True,
+            },
+        }, None
 
     user.last_login_at = datetime.now(UTC)
 

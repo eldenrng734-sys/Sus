@@ -1,4 +1,3 @@
-
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
@@ -22,24 +21,30 @@ def count_recent_failures(
 
     since = datetime.now(UTC) - timedelta(minutes=window_minutes)
 
-    email_count = session.scalar(
-        select(func.count(AuthAttempt.id)).where(
-            AuthAttempt.email == email.strip().lower(),
-            AuthAttempt.success.is_(False),
-            AuthAttempt.created_at >= since,
+    email_count = (
+        session.scalar(
+            select(func.count(AuthAttempt.id)).where(
+                AuthAttempt.email == email.strip().lower(),
+                AuthAttempt.success.is_(False),
+                AuthAttempt.created_at >= since,
+            )
         )
-    ) or 0
+        or 0
+    )
 
     ip_count = 0
 
     if ip_address:
-        ip_count = session.scalar(
-            select(func.count(AuthAttempt.id)).where(
-                AuthAttempt.ip_address == ip_address,
-                AuthAttempt.success.is_(False),
-                AuthAttempt.created_at >= since,
+        ip_count = (
+            session.scalar(
+                select(func.count(AuthAttempt.id)).where(
+                    AuthAttempt.ip_address == ip_address,
+                    AuthAttempt.success.is_(False),
+                    AuthAttempt.created_at >= since,
+                )
             )
-        ) or 0
+            or 0
+        )
 
     return email_count, ip_count
 

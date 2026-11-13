@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str = ""
+    migration_database_url: str = ""
     smtp_host: str = "mailpit"
     password_reset_ttl_minutes: int = 30
     email_verification_ttl_hours: int = 24
@@ -14,6 +15,8 @@ class Settings(BaseSettings):
     email_verification_ttl_hours: int = 24
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
+    mfa_encryption_key: str = ""
+    mfa_issuer: str = "AI Sales Assistant CRM"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
     cookie_secure: bool = False  # set COOKIE_SECURE=true in staging/production

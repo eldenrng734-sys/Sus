@@ -5,22 +5,27 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-# ---- ADAPT THESE THREE IMPORTS to the names found in Step 1 ----
-from app.database.session import get_db
-from app.core.security import hash_password
-from app.modules.auth.models import RefreshToken
 # -----------------------------------------------------------------
-
 from app.core.config import settings
+from app.core.security import hash_password
+
+# ---- ADAPT THESE THREE IMPORTS to the names found in Step 1 ----
+from app.database.session import get_session
 from app.modules.auth import tokens
 from app.modules.auth.emails import send_password_reset_email, send_verification_email
+from app.modules.auth.models import RefreshToken
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 RESET_REQUESTED = {"data": {"message": "If the account exists, a reset email has been sent."}}
-VERIFY_REQUESTED = {"data": {"message": "If the account exists and is unverified, an email has been sent."}}
-INVALID_TOKEN = {"code": "invalid_or_expired_token", "message": "This link is invalid or has expired."}
+VERIFY_REQUESTED = {
+    "data": {"message": "If the account exists and is unverified, an email has been sent."}
+}
+INVALID_TOKEN = {
+    "code": "invalid_or_expired_token",
+    "message": "This link is invalid or has expired.",
+}
 
 
 class EmailBody(BaseModel):
@@ -42,7 +47,7 @@ class ResetConfirmBody(TokenBody):
 
 @router.post("/password-reset", status_code=status.HTTP_202_ACCEPTED)
 def request_password_reset(
-    body: EmailBody, background: BackgroundTasks, db: Session = Depends(get_db)
+    body: EmailBody, background: BackgroundTasks, db: Session = Depends(get_session)
 ):
     user = db.scalar(select(User).where(User.email == body.email, User.is_active.is_(True)))
     if user is not None:
@@ -60,7 +65,7 @@ def request_password_reset(
 
 
 @router.post("/password-reset/confirm", status_code=status.HTTP_204_NO_CONTENT)
-def confirm_password_reset(body: ResetConfirmBody, db: Session = Depends(get_db)):
+def confirm_password_reset(body: ResetConfirmBody, db: Session = Depends(get_session)):
     user_id = tokens.consume_token(db, body.token, tokens.PASSWORD_RESET)
     if user_id is None:
         raise HTTPException(status_code=400, detail=INVALID_TOKEN)
@@ -82,7 +87,7 @@ def confirm_password_reset(body: ResetConfirmBody, db: Session = Depends(get_db)
 
 
 @router.post("/verify-email", status_code=status.HTTP_204_NO_CONTENT)
-def verify_email(body: TokenBody, db: Session = Depends(get_db)):
+def verify_email(body: TokenBody, db: Session = Depends(get_session)):
     user_id = tokens.consume_token(db, body.token, tokens.EMAIL_VERIFICATION)
     if user_id is None:
         raise HTTPException(status_code=400, detail=INVALID_TOKEN)
@@ -97,7 +102,7 @@ def verify_email(body: TokenBody, db: Session = Depends(get_db)):
 
 @router.post("/verify-email/resend", status_code=status.HTTP_202_ACCEPTED)
 def resend_verification(
-    body: EmailBody, background: BackgroundTasks, db: Session = Depends(get_db)
+    body: EmailBody, background: BackgroundTasks, db: Session = Depends(get_session)
 ):
     user = db.scalar(
         select(User).where(
