@@ -58,7 +58,6 @@ class TenantContext:
 
 
 def _claims(authorization: str | None) -> tuple[uuid.UUID, uuid.UUID, list[str]]:
-def _claims(authorization: str | None) -> tuple[uuid.UUID, uuid.UUID]:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise AuthError(401, "unauthorized", "Missing or invalid access token")
     try:
@@ -67,7 +66,6 @@ def _claims(authorization: str | None) -> tuple[uuid.UUID, uuid.UUID]:
         if not isinstance(amr, list) or not all(isinstance(item, str) for item in amr):
             raise ValueError("invalid authentication methods")
         return uuid.UUID(payload["sub"]), uuid.UUID(payload["sid"]), amr
-        return uuid.UUID(payload["sub"]), uuid.UUID(payload["sid"])
     except (jwt.PyJWTError, ValueError, KeyError) as exc:
         raise AuthError(401, "unauthorized", "Missing or invalid access token") from exc
 
@@ -75,7 +73,6 @@ def _claims(authorization: str | None) -> tuple[uuid.UUID, uuid.UUID]:
 def _check_user_and_session(
     session: Session, user_id: uuid.UUID, session_id: uuid.UUID, amr: list[str]
 ) -> None:
-def _check_user_and_session(session: Session, user_id: uuid.UUID, session_id: uuid.UUID) -> None:
     # app.user_id lets the pre-tenant RLS policies find this user's own memberships.
     _set_context(session, USER_KEY, str(user_id))
 
@@ -105,7 +102,6 @@ def get_tenant_context(
     session: Session = Depends(get_session),
 ) -> TenantContext:
     user_id, session_id, amr = _claims(authorization)
-    user_id, session_id = _claims(authorization)
 
     if not x_tenant_id:
         raise AuthError(400, "bad_request", "X-Tenant-ID header is required")
@@ -115,7 +111,6 @@ def get_tenant_context(
         raise AuthError(400, "bad_request", "X-Tenant-ID must be a UUID") from exc
 
     _check_user_and_session(session, user_id, session_id, amr)
-    _check_user_and_session(session, user_id, session_id)
 
     membership = session.scalar(
         select(TenantMembership).where(

@@ -1,6 +1,6 @@
-﻿from types import SimpleNamespace
+﻿import uuid
+from types import SimpleNamespace
 from unittest.mock import MagicMock
-import uuid
 
 import pytest
 from pydantic import ValidationError

@@ -1,8 +1,9 @@
 import uuid
 from collections.abc import Callable, Iterator
-from cryptography.fernet import Fernet
+
 import pyotp
 import pytest
+from cryptography.fernet import Fernet
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
