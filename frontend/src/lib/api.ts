@@ -1,4 +1,5 @@
-﻿export async function apiFetch<T>(
+export async function apiFetch<T>(
+
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -33,6 +34,12 @@
     } else if (body?.error?.message) {
       detail = body.error.message;
     }
+    throw new Error(detail);
+  }
+
+  const json = await res.json();
+  return (json.data ?? json) as T;
+}
 
     throw new Error(detail);
   }

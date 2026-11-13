@@ -57,7 +57,7 @@ class TenantContext:
     session_id: uuid.UUID
 
 
-def _claims(authorization: str | None) -> tuple[uuid.UUID, uuid.UUID, list[str]]:
+def _claims(authorization: str | None) -> tuple[uuid.UUID, uuid.UUID]:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise AuthError(401, "unauthorized", "Missing or invalid access token")
     try:

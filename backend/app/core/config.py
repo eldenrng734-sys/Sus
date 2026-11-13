@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
 
 
 class Settings(BaseSettings):
@@ -22,7 +23,10 @@ class Settings(BaseSettings):
     cookie_secure: bool = False  # set COOKIE_SECURE=true in staging/production
     allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+    env_file=Path(__file__).resolve().parents[3] / ".env",
+    extra="ignore",
+)
 
 
 settings = Settings()

@@ -100,12 +100,7 @@ def main() -> None:
                 )
             print(f"seeded {c['slug']}: {len(TEAM_NAMES)} teams, {len(PEOPLE)} users")
 
-    print(
-        "done. Dev login password is set by SEED_PASSWORD (default in this file); "
-        "never use it in production."
-        "done. Dev login password is set by SEED_PASSWORD "
-        "(default in this file); never use it in production."
-    )
+    print("done. Dev login password is set by SEED_PASSWORD (default in this file); never use it in production.")
 
 
 if __name__ == "__main__":

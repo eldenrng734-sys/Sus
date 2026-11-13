@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import Callable, Iterator
-
+from cryptography.fernet import Fernet
+import pyotp
 import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
@@ -29,11 +30,18 @@ from tests.cross_tenant.support import (
 NEEDED_TABLES = {"tenants", "users", "tenant_memberships", "teams", "leads", "refresh_tokens"}
 
 
+
 @pytest.fixture(scope="session", autouse=True)
 def _jwt_secret() -> Iterator[None]:
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(settings, "jwt_secret_key", "t" * 48)
+        patch.setattr(
+            settings,
+            "mfa_encryption_key",
+            Fernet.generate_key().decode(),
+        )
         yield
+
 
 
 @pytest.fixture(scope="session")
@@ -42,7 +50,7 @@ def admin_engine() -> Iterator[Engine]:
     if url is None:
         pytest.skip("No test database configured (set TEST_DATABASE_URL or POSTGRES_* in .env)")
     assert_is_test_database(url)
-    engine = create_engine(url, pool_pre_ping=True)
+    engine = create_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 5})
     try:
         with engine.connect() as conn:
             rows = conn.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'"))
@@ -63,7 +71,7 @@ def app_engine(admin_engine: Engine) -> Iterator[Engine]:
     if url is None:
         pytest.skip("Set TEST_APP_DATABASE_URL (the non-owner crm_app role) to run RLS tests")
     assert_is_test_database(url)
-    engine = create_engine(url, pool_pre_ping=True)
+    engine = create_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 5})
     yield engine
     engine.dispose()
 
@@ -117,17 +125,76 @@ def admin_client(make_client: Callable[[Engine], TestClient], admin_engine: Engi
     return make_client(admin_engine)
 
 
+
 @pytest.fixture(scope="session")
-def tokens(admin_client: TestClient, seed: Seed) -> dict[tuple[str, str], dict[str, str]]:
-    """Log in every seeded user once. Key: (company letter, user key)."""
+def tokens(
+    admin_client: TestClient,
+    seed: Seed,
+) -> dict[tuple[str, str], dict[str, str]]:
+    """Log in every seeded user and complete MFA enrollment for admins."""
     result: dict[tuple[str, str], dict[str, str]] = {}
+
     for letter in ("a", "b"):
-        for key, _role, _active in USER_PLAN:
+        for key, role, _active in USER_PLAN:
             email = seed.get(letter).users[key][1]
+
+            # Step 1: Log in.
             response = admin_client.post(
-                "/api/v1/auth/login", json={"email": email, "password": PASSWORD}
+                "/api/v1/auth/login",
+                json={"email": email, "password": PASSWORD},
             )
-            assert response.status_code == 200, response.text
-            token = response.json()["data"]["access_token"]
-            result[(letter, key)] = {"Authorization": f"Bearer {token}"}
+            assert response.status_code == 200, (
+                f"Login failed for {letter}/{key}: {response.text}"
+            )
+
+            login_data = response.json()["data"]
+
+            # Step 2: Admins must complete MFA before receiving a token.
+            if role == "admin":
+                assert login_data.get("mfa_setup_required") is True, (
+                    f"Expected MFA enrollment for {letter}/{key}, "
+                    f"received: {login_data}"
+                )
+
+                challenge = login_data["challenge"]
+
+                # Start MFA enrollment and retrieve the TOTP secret.
+                setup_response = admin_client.post(
+                    "/api/v1/auth/mfa/setup",
+                    json={"challenge": challenge},
+                )
+                assert setup_response.status_code == 200, (
+                    f"MFA setup failed for {letter}/{key}: "
+                    f"{setup_response.text}"
+                )
+
+                secret = setup_response.json()["data"]["secret"]
+
+                # Generate a valid time-based one-time password.
+                code = pyotp.TOTP(secret).now()
+
+                # Confirm enrollment and obtain the authenticated session.
+                confirm_response = admin_client.post(
+                    "/api/v1/auth/mfa/confirm",
+                    json={
+                        "challenge": challenge,
+                        "code": code,
+                    },
+                )
+                assert confirm_response.status_code == 200, (
+                    f"MFA confirmation failed for {letter}/{key}: "
+                    f"{confirm_response.text}"
+                )
+
+                token = confirm_response.json()["data"]["access_token"]
+
+            else:
+                # Managers and reps use the normal login response.
+                token = login_data["access_token"]
+
+            result[(letter, key)] = {
+                "Authorization": f"Bearer {token}"
+            }
+
     return result
+

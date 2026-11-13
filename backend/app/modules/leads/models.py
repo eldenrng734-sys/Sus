@@ -30,12 +30,14 @@ class Lead(UUIDPkMixin, TimestampMixin, Base):
         nullable=False,
     )
 
-    name: Mapped[str | None] = mapped_column(String(200))
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str | None] = mapped_column(String(320))
     phone: Mapped[str | None] = mapped_column(String(32))
     company_name: Mapped[str | None] = mapped_column(String(200))
 
-    source: Mapped[str] = mapped_column(String(50), nullable=False)
+    source: Mapped[str] = mapped_column(
+        String(50), nullable=False, server_default=text("'manual'")
+    )
     source_campaign: Mapped[str | None] = mapped_column(String(200))
     external_id: Mapped[str | None] = mapped_column(String(200))
 
@@ -47,17 +49,19 @@ class Lead(UUIDPkMixin, TimestampMixin, Base):
 
     intent: Mapped[str | None] = mapped_column(String(50))
     lead_score: Mapped[int | None] = mapped_column(Integer)
-    priority: Mapped[str | None] = mapped_column(String(10))
+    priority: Mapped[str] = mapped_column(
+        String(10), nullable=False, server_default=text("'medium'")
+    )
 
     consent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    consent_source: Mapped[str | None] = mapped_column(String(20))
     opted_out: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    opted_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
 
     __table_args__ = (
-        UniqueConstraint(
-            "tenant_id",
-            "id",
-            name="uq_leads_tenant_id_id",
-        ),
+        UniqueConstraint("tenant_id", "id", name="uq_leads_tenant_id_id"),
         ForeignKeyConstraint(
             ["tenant_id", "assigned_user_id"],
             ["tenant_memberships.tenant_id", "tenant_memberships.user_id"],
@@ -73,12 +77,34 @@ class Lead(UUIDPkMixin, TimestampMixin, Base):
             name="status_valid",
         ),
         CheckConstraint(
-            "priority IS NULL OR priority IN ('low', 'medium', 'high')",
-            name="priority_valid",
+            (
+                "source IN ('website_form','tracking','whatsapp','facebook_lead_ads',"
+                "'messenger','manual','csv')"
+            ),
+            name="source_valid",
         ),
+        CheckConstraint(
+            (
+                "lost_reason IS NULL OR lost_reason IN "
+                "('price','timing','no_response','competitor','not_qualified','other')"
+            ),
+            name="lost_reason_valid",
+        ),
+        CheckConstraint("status <> 'lost' OR lost_reason IS NOT NULL", name="lost_reason_required"),
+        CheckConstraint("priority IN ('low', 'medium', 'high')", name="priority_valid"),
         CheckConstraint(
             "lead_score IS NULL OR (lead_score BETWEEN 0 AND 100)",
             name="score_range",
+        ),
+        CheckConstraint("email IS NULL OR email = lower(email)", name="email_lowercase"),
+        CheckConstraint("email IS NOT NULL OR phone IS NOT NULL", name="contact_required"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        CheckConstraint(
+            (
+                "consent_source IS NULL OR consent_source IN "
+                "('web_form','whatsapp','manual','import','api')"
+            ),
+            name="consent_source_valid",
         ),
         Index(
             "uq_leads_tenant_source_external",
@@ -93,6 +119,8 @@ class Lead(UUIDPkMixin, TimestampMixin, Base):
         Index("ix_leads_tenant_status", "tenant_id", "status"),
         Index("ix_leads_tenant_email", "tenant_id", "email"),
         Index("ix_leads_tenant_phone", "tenant_id", "phone"),
+        Index("ix_leads_tenant_team", "tenant_id", "team_id"),
+        Index("ix_leads_tenant_priority", "tenant_id", "priority"),
     )
 
 
@@ -162,6 +190,11 @@ class Interaction(UUIDPkMixin, TimestampMixin, Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
     )
 
     __table_args__ = (
