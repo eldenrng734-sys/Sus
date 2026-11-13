@@ -25,6 +25,14 @@ class LeadAssignRequest(BaseModel):
     team_id: uuid.UUID
 
 
+class LeadAutoAssignRequest(BaseModel):
+    """Round-robin target. Defaults to the lead's team, then the caller's team."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    team_id: uuid.UUID | None = None
+
+
 def _clean_phone(value: str | None) -> str | None:
     if value is None:
         return None
