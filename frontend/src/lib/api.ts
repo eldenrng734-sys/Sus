@@ -1,11 +1,17 @@
 export async function apiFetch<T>(
+
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
   const token =
-    typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    typeof window !== "undefined"
+      ? localStorage.getItem("access_token")
+      : null;
+
   const tenantId =
-    typeof window !== "undefined" ? localStorage.getItem("tenant_id") : null;
+    typeof window !== "undefined"
+      ? localStorage.getItem("tenant_id")
+      : null;
 
   const res = await fetch(`/api/v1${path}`, {
     ...options,
@@ -20,6 +26,7 @@ export async function apiFetch<T>(
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     let detail = `Request failed (${res.status})`;
+
     if (typeof body.detail === "string") {
       detail = body.detail;
     } else if (Array.isArray(body.detail)) {
@@ -29,6 +36,15 @@ export async function apiFetch<T>(
     }
     throw new Error(detail);
   }
+
+  const json = await res.json();
+  return (json.data ?? json) as T;
+}
+
+    throw new Error(detail);
+  }
+
+  if (res.status === 204) return undefined as T;
 
   const json = await res.json();
   return (json.data ?? json) as T;

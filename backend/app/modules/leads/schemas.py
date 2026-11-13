@@ -95,6 +95,10 @@ class LeadUpdate(BaseModel):
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=32)
     company_name: str | None = Field(default=None, max_length=200)
+    priority: Literal["low", "medium", "high"] | None = None
+    status: Literal["new", "contacted", "qualified", "proposal", "won", "lost"] | None = None
+    lost_reason: str | None = None
+    reopen_reason: str | None = Field(default=None, max_length=500)
     priority: LeadPriority | None = None
     status: LeadStatus | None = None
     lost_reason: LostReason | None = None
@@ -110,6 +114,7 @@ class LeadUpdate(BaseModel):
     @field_validator("email")
     @classmethod
     def lower_email(cls, value):
+        return value.strip().lower() if value else None
         return _lower_email(value)
 
     @field_validator("phone")
