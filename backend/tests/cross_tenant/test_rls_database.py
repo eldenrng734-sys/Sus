@@ -24,7 +24,7 @@ def _visible_leads(engine, tenant_id=None) -> set[str]:
         return {str(row[0]) for row in conn.execute(text("SELECT id FROM leads"))}
 
 
-@rls_pending
+
 def test_every_tenant_table_has_forced_rls_and_a_tenant_policy(admin_engine):
     with admin_engine.connect() as conn:
         tables = [
@@ -48,7 +48,7 @@ def test_every_tenant_table_has_forced_rls_and_a_tenant_policy(admin_engine):
     assert not no_policy, f"No app.tenant_id policy on: {no_policy}"
 
 
-@rls_pending
+
 def test_crm_app_role_cannot_bypass_rls(admin_engine):
     with admin_engine.connect() as conn:
         row = conn.execute(

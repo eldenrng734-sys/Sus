@@ -3,6 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.permissions import apply_data_scope
 from app.core.tenancy import TenantContext
 from app.modules.audit.service import record_audit_event
 from app.modules.auth.errors import AuthError
@@ -18,18 +19,15 @@ def assign_lead(
     lead_id: uuid.UUID,
     body: LeadAssignRequest,
 ) -> dict:
-    lead = session.scalar(
-        select(Lead).where(
-            Lead.id == lead_id,
-            Lead.tenant_id == context.tenant_id,
-        )
-    )
+    statement = apply_data_scope(
+        select(Lead).where(Lead.id == lead_id),
+        Lead,
+        context,
+    ).with_for_update()
+    lead = session.scalar(statement)
 
     if lead is None:
         raise AuthError(404, "not_found", "Lead not found")
-
-    if context.role == "manager" and lead.team_id != context.team_id:
-        raise AuthError(403, "forbidden", "You can only assign leads in your team")
 
     membership = session.scalar(
         select(TenantMembership)
@@ -64,7 +62,7 @@ def assign_lead(
             Interaction(
                 tenant_id=context.tenant_id,
                 lead_id=lead.id,
-                type="assignment",
+                type="assigned",
                 source="manual",
                 details={
                     "old_assigned_user_id": (
@@ -75,8 +73,10 @@ def assign_lead(
                     "new_team_id": str(body.team_id),
                     "actor_user_id": str(context.user_id),
                 },
+                created_by_user_id=context.user_id,
             )
         )
+        lead.version += 1
 
         record_audit_event(
             session,
@@ -104,4 +104,5 @@ def assign_lead(
         "assigned_user_id": str(lead.assigned_user_id),
         "team_id": str(lead.team_id),
         "status": lead.status,
+        "version": lead.version,
     }
