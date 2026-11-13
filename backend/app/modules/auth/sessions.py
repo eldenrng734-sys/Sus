@@ -21,7 +21,12 @@ def _now() -> datetime:
 
 
 def _new_token(
-    db: Session, user_id: uuid.UUID, family_id: uuid.UUID, ip: str | None, ua: str | None
+    db: Session,
+    user_id: uuid.UUID,
+    family_id: uuid.UUID,
+    ip: str | None,
+    ua: str | None,
+    mfa_verified: bool = False,
 ) -> tuple[RefreshToken, str]:
     raw = generate_refresh_token()
     row = RefreshToken(
@@ -31,6 +36,7 @@ def _new_token(
         expires_at=_now() + timedelta(days=settings.refresh_token_expire_days),
         ip_address=ip,
         user_agent=ua,
+        mfa_verified=mfa_verified,
     )
     db.add(row)
     db.flush()
@@ -38,15 +44,24 @@ def _new_token(
 
 
 def start_session(
-    db: Session, user_id: uuid.UUID, ip: str | None, ua: str | None
+    db: Session,
+    user_id: uuid.UUID,
+    ip: str | None,
+    ua: str | None,
+    *,
+    mfa_verified: bool = False,
 ) -> dict[str, str]:
     """Called at login. The caller commits. sid in the access token = family_id."""
     family_id = uuid.uuid4()
-    _, raw = _new_token(db, user_id, family_id, ip, ua)
+    _, raw = _new_token(db, user_id, family_id, ip, ua, mfa_verified)
     return {
         "refresh_token": raw,
         "csrf_token": generate_csrf_token(),
-        "access_token": create_access_token(user_id, family_id),
+        "access_token": create_access_token(
+            user_id,
+            family_id,
+            amr=["pwd", "totp"] if mfa_verified else ["pwd"],
+        ),
     }
 
 
@@ -95,12 +110,18 @@ def refresh(db: Session, raw_token: str | None, ip: str | None, ua: str | None) 
         db.commit()
         raise AuthError(401, "unauthorized", "Session is no longer valid")
 
-    new_row, new_raw = _new_token(db, row.user_id, row.family_id, ip, ua)
+    new_row, new_raw = _new_token(
+        db, row.user_id, row.family_id, ip, ua, mfa_verified=row.mfa_verified
+    )
     new_row.tenant_id = row.tenant_id
     row.revoked_at = _now()
     row.replaced_by_id = new_row.id
     row.last_used_at = _now()
-    access = create_access_token(row.user_id, row.family_id)
+    access = create_access_token(
+        row.user_id,
+        row.family_id,
+        amr=["pwd", "totp"] if row.mfa_verified else ["pwd"],
+    )
     db.commit()
 
     data = {
