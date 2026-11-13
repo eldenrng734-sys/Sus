@@ -17,6 +17,7 @@ from app.modules.conversations.schemas import (
     TimelineEvent,
 )
 from app.modules.leads.models import Interaction, Lead
+from app.modules.leads.optout import can_message
 
 # messages.provider only allows these two (see the DB check constraint)
 MESSAGE_CHANNELS = ("whatsapp", "messenger")
@@ -139,8 +140,11 @@ def send_message(session: Session, context: TenantContext, body: MessageCreate) 
             422, "validation_error", "Messages are only supported on WhatsApp and Messenger"
         )
     lead = _get_lead(session, context, conversation.lead_id)
-    if lead.opted_out:
-        raise AuthError(409, "conflict", "This lead has opted out of messages")
+    allowed, reason = can_message(lead)
+    if not allowed:
+        if reason == "opt_out":
+            raise AuthError(403, "opt_out", "This lead has opted out of messages")
+        raise AuthError(403, "no_consent", "This lead has not consented to messages")
 
     message = Message(
         tenant_id=context.tenant_id,
