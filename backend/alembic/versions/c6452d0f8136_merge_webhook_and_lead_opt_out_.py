@@ -6,8 +6,6 @@ Revises: a7d3c91e5b20, d7b1f4a6c802
 
 from typing import Sequence, Union
 
-from typing import Sequence, Union
-
 # revision identifiers, used by Alembic.
 revision: str = "c6452d0f8136"
 down_revision: Union[str, Sequence[str], None] = ("a7d3c91e5b20", "d7b1f4a6c802")
