@@ -42,9 +42,16 @@ def upgrade() -> None:
     op.execute(
         """
         UPDATE leads SET source = 'manual'
-        WHERE source NOT IN (
-            'website_form','tracking','whatsapp','facebook_lead_ads','messenger','manual','csv'
-        )
+        WHERE source IS NULL
+           OR source NOT IN (
+               'website_form',
+               'tracking',
+               'whatsapp',
+               'facebook_lead_ads',
+               'messenger',
+               'manual',
+               'csv'
+           )
         """
     )
     op.execute(

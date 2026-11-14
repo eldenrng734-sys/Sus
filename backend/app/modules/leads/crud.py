@@ -257,11 +257,7 @@ def _check_duplicate(
                 ctx,
             )
         )
-        details = (
-            [{"existing_lead_id": str(existing_id)}]
-            if visible_id is not None
-            else []
-        )
+        details = [{"existing_lead_id": str(existing_id)}] if visible_id is not None else []
         raise AuthError(
             409,
             "duplicate_lead",
@@ -303,9 +299,7 @@ def create_lead(
                 session, ctx, body.assigned_user_id, body.team_id
             )
         elif ctx.role == "manager":
-            assigned_user_id, team_id = _validate_assignment(
-                session, ctx, None, ctx.team_id
-            )
+            assigned_user_id, team_id = _validate_assignment(session, ctx, None, ctx.team_id)
         else:
             assigned_user_id, team_id = None, None
 
@@ -537,11 +531,7 @@ def list_leads(
     rows = session.scalars(statement.limit(limit + 1)).all()
     has_more = len(rows) > limit
     rows = rows[:limit]
-    next_cursor = (
-        _encode_cursor(rows[-1], sort_field, descending)
-        if has_more and rows
-        else None
-    )
+    next_cursor = _encode_cursor(rows[-1], sort_field, descending) if has_more and rows else None
     return (
         [lead_out(row) for row in rows],
         {"next_cursor": next_cursor, "has_more": has_more},
@@ -641,9 +631,7 @@ def get_lead(
                 "type": task.type,
                 "status": task.status,
                 "due_at": task.due_at.isoformat(),
-                "assigned_user_id": (
-                    str(task.assigned_user_id) if task.assigned_user_id else None
-                ),
+                "assigned_user_id": (str(task.assigned_user_id) if task.assigned_user_id else None),
                 "version": task.version,
             }
             if task
@@ -704,9 +692,7 @@ def update_lead(
             )
             changed_fields.update({"assigned_user_id", "team_id"})
 
-        if reopen_reason is not None and not (
-            old_status == "lost" and new_status == "contacted"
-        ):
+        if reopen_reason is not None and not (old_status == "lost" and new_status == "contacted"):
             raise AuthError(
                 422,
                 "validation_error",
@@ -773,8 +759,10 @@ def update_lead(
         if changed_fields or assignment_requested:
             lead.version += 1
             general_changes = changed_fields - {"status", "lost_reason"}
-            if general_changes or assignment_requested or (
-                lost_reason is not None and new_status == old_status
+            if (
+                general_changes
+                or assignment_requested
+                or (lost_reason is not None and new_status == old_status)
             ):
                 record_audit_event(
                     session,
@@ -793,7 +781,6 @@ def update_lead(
     except Exception:
         session.rollback()
         raise
-
 
 
 def add_note(session: Session, ctx: TenantContext, lead_id: uuid.UUID, body: NoteCreate) -> dict:
