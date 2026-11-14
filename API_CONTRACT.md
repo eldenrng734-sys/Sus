@@ -554,6 +554,8 @@ Route ordering: declare static paths before parameterized paths (`GET /tasks/due
 | GET | `/api/v1/conversations` | Tenant | Any (scoped) | List conversations |
 | GET | `/api/v1/conversations/{id}` | Tenant | Any (scoped) | Conversation detail |
 | GET | `/api/v1/conversations/{id}/messages` | Tenant | Any (scoped) | Message history |
+| POST | `/api/v1/conversations/{id}/analyze` | Tenant | Any (scoped) | Generate and store summary and sentiment |
+| GET | `/api/v1/conversations/{id}/analysis` | Tenant | Any (scoped) | Get latest summary and sentiment |
 | POST | `/api/v1/conversations/{id}/read` | Tenant | Any (scoped) | Mark conversation read |
 | POST | `/api/v1/messages` | Tenant | Any (scoped) | Send outbound message |
 | POST | `/api/v1/tasks` | Tenant | Any (scoped) | Create task |
@@ -1132,6 +1134,10 @@ Role scoping:
 `GET /api/v1/conversations/{id}` returns the conversation, lead summary, assigned user, and unread count.
 
 `GET /api/v1/conversations/{id}/messages?cursor=&limit=50` returns messages newest first. `meta.next_cursor` loads older messages.
+
+`POST /api/v1/conversations/{id}/analyze` sends up to the latest 100 messages (bounded to 20,000 characters) to the configured OpenAI model after redacting known lead name/contact information, email addresses, and phone numbers. It validates and stores the summary, sentiment, model, prompt version, confidence, and review status in `lead_assessments`. Configure `OPENAI_API_KEY` and optionally `OPENAI_MODEL`; a missing key returns `503`, and provider/invalid-output errors return `502`.
+
+`GET /api/v1/conversations/{id}/analysis` returns the latest stored summary and sentiment for that conversation. Both routes use the caller's normal lead visibility scope.
 
 `POST /api/v1/conversations/{id}/read` marks unread messages as read and returns `204`. It is scoped to the caller.
 

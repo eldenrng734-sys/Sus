@@ -56,6 +56,7 @@ def test_persist_assessment_stores_versions_and_only_redacted_output():
         conversation_id=conversation_id,
         output=AssessmentOutput(
             intent="request_demo",
+            sentiment="positive",
             confidence=0.4,
             summary="Ayesha asked for a demo; call +1 415 555 0199",
         ),

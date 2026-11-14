@@ -24,6 +24,17 @@ class ConversationOut(BaseModel):
     created_at: datetime
 
 
+class ConversationAnalysisOut(BaseModel):
+    summary: str
+    sentiment: Literal["positive", "neutral", "negative"]
+    confidence: float | None
+    needs_human_review: bool
+    status: str
+    model: str
+    prompt_version: str
+    created_at: datetime
+
+
 class MessageCreate(BaseModel):
     conversation_id: uuid.UUID
     message_text: str = Field(min_length=1, max_length=4096)

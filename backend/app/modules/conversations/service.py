@@ -5,11 +5,20 @@ from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.permissions import apply_data_scope
 from app.core.tenancy import TenantContext
+from app.modules.ai.models import LeadAssessment
+from app.modules.ai.provider import AIProviderError, analyze_with_openai
+from app.modules.ai.service import (
+    PROMPT_VERSION,
+    build_assessment_prompt,
+    persist_assessment,
+)
 from app.modules.auth.errors import AuthError
 from app.modules.conversations.models import Conversation, Message
 from app.modules.conversations.schemas import (
+    ConversationAnalysisOut,
     ConversationCreate,
     ConversationOut,
     MessageCreate,
@@ -130,6 +139,124 @@ def list_messages(
         .offset(offset)
     )
     return [MessageOut.model_validate(m) for m in session.scalars(stmt)]
+
+
+def analyze_conversation(
+    session: Session,
+    context: TenantContext,
+    conversation_id: uuid.UUID,
+) -> ConversationAnalysisOut:
+    conversation = _get_conversation(session, context, conversation_id)
+    lead = _get_lead(session, context, conversation.lead_id)
+    messages = list(
+        session.scalars(
+            select(Message)
+            .where(
+                Message.tenant_id == context.tenant_id,
+                Message.conversation_id == conversation.id,
+                Message.message_text.is_not(None),
+            )
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .limit(100)
+        )
+    )
+    content = [
+        f"{'Customer' if message.direction == 'inbound' else 'Agent'}: "
+        f"{message.message_text}"
+        for message in reversed(messages)
+        if message.message_text and message.message_text.strip()
+    ]
+    if not content:
+        raise AuthError(422, "validation_error", "Conversation has no messages to analyze")
+
+    prompt = build_assessment_prompt(
+        _bounded_conversation(content),
+        pii_values=(lead.name, lead.email or "", lead.phone or ""),
+    )
+    if (
+        settings.openai_api_key is None
+        or not settings.openai_api_key.get_secret_value().strip()
+    ):
+        raise AuthError(503, "service_unavailable", "AI conversation analysis is not configured")
+
+    api_key = settings.openai_api_key.get_secret_value()
+    model = settings.openai_model
+    lead_id = lead.id
+    scoped_conversation_id = conversation.id
+    pii_values = (lead.name, lead.email or "", lead.phone or "")
+    session.commit()
+    try:
+        output = analyze_with_openai(
+            prompt,
+            api_key=api_key,
+            model=model,
+            timeout_seconds=settings.openai_timeout_seconds,
+        )
+    except AIProviderError:
+        raise AuthError(502, "provider_error", "AI conversation analysis failed") from None
+
+    assessment = persist_assessment(
+        session,
+        tenant_id=context.tenant_id,
+        lead_id=lead_id,
+        conversation_id=scoped_conversation_id,
+        output=output,
+        model=model,
+        prompt_version=PROMPT_VERSION,
+        pii_values=pii_values,
+    )
+    session.commit()
+    return _conversation_analysis_out(assessment)
+
+
+def get_conversation_analysis(
+    session: Session,
+    context: TenantContext,
+    conversation_id: uuid.UUID,
+) -> ConversationAnalysisOut:
+    conversation = _get_conversation(session, context, conversation_id)
+    assessment = session.scalar(
+        select(LeadAssessment)
+        .where(
+            LeadAssessment.tenant_id == context.tenant_id,
+            LeadAssessment.conversation_id == conversation.id,
+        )
+        .order_by(LeadAssessment.created_at.desc(), LeadAssessment.id.desc())
+        .limit(1)
+    )
+    if assessment is None:
+        raise AuthError(404, "not_found", "Conversation analysis not found")
+    return _conversation_analysis_out(assessment)
+
+
+def _bounded_conversation(messages: list[str]) -> list[str]:
+    remaining = 20_000
+    selected = []
+    for message in reversed(messages[-100:]):
+        excerpt = message[-4_000:]
+        excerpt = excerpt[-remaining:]
+        if not excerpt:
+            break
+        selected.append(excerpt)
+        remaining -= len(excerpt)
+        if remaining == 0:
+            break
+    return list(reversed(selected))
+
+
+def _conversation_analysis_out(assessment: LeadAssessment) -> ConversationAnalysisOut:
+    if assessment.summary is None or assessment.sentiment is None:
+        raise AuthError(404, "not_found", "Conversation analysis not found")
+    return ConversationAnalysisOut(
+        summary=assessment.summary,
+        sentiment=assessment.sentiment,
+        confidence=float(assessment.confidence) if assessment.confidence is not None else None,
+        needs_human_review=assessment.needs_human_review,
+        status=assessment.status,
+        model=assessment.model,
+        prompt_version=assessment.prompt_version,
+        created_at=assessment.created_at,
+    )
 
 
 def send_message(session: Session, context: TenantContext, body: MessageCreate) -> MessageOut:
