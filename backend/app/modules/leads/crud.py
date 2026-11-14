@@ -15,6 +15,7 @@ from app.core.tenancy import TenantContext
 from app.modules.audit.service import record_audit_event
 from app.modules.auth.errors import AuthError
 from app.modules.idempotency.models import IdempotencyKey
+from app.modules.leads.assignment import assign_round_robin
 from app.modules.leads.models import Interaction, Lead
 from app.modules.leads.schemas import LeadCreate, LeadUpdate, NoteCreate
 from app.modules.leads.transitions import check_transition
@@ -361,6 +362,15 @@ def create_lead(
             entity_id=lead.id,
             details={"source": body.source, "has_initial_note": bool(body.notes)},
         )
+
+        # Unowned leads created for a team enter the round-robin rotation.
+        if assigned_user_id is None and team_id is not None:
+            assign_round_robin(
+                session,
+                lead=lead,
+                team_id=team_id,
+                actor_user_id=ctx.user_id,
+            )
 
         result = lead_out(lead)
         _store_create_response(session, idempotency_id, result)
@@ -785,6 +795,7 @@ def update_lead(
         raise
 
 
+
 def add_note(session: Session, ctx: TenantContext, lead_id: uuid.UUID, body: NoteCreate) -> dict:
     try:
         lead = _get_scoped(session, ctx, lead_id)
@@ -807,39 +818,6 @@ def add_note(session: Session, ctx: TenantContext, lead_id: uuid.UUID, body: Not
             actor_user_id=ctx.user_id,
             entity_type="lead",
             entity_id=lead.id,
-            details={"from": old_status, "to": new_status},
-        )
-
-    for field, value in changes.items():
-        setattr(lead, field, value)
-
-    if lead.email is None and lead.phone is None:
-        session.rollback()
-        raise AuthError(422, "validation_error", "A lead needs an email or a phone number")
-
-    session.commit()
-    session.refresh(lead)
-    return lead_out(lead)
-
-
-def add_note(session: Session, ctx: TenantContext, lead_id: uuid.UUID, body: NoteCreate) -> dict:
-    lead = _get_scoped(session, ctx, lead_id)
-    note = Interaction(
-        tenant_id=ctx.tenant_id,
-        lead_id=lead.id,
-        type="note",
-        source="manual",
-        details={"text": body.text, "actor_user_id": str(ctx.user_id)},
-    )
-    session.add(note)
-    session.commit()
-    session.refresh(note)
-    return {
-        "id": str(note.id),
-        "type": "note",
-        "text": body.text,
-        "created_at": note.created_at.isoformat(),
-    }
             details={"interaction_id": str(note.id)},
         )
         result = {

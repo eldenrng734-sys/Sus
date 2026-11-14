@@ -1063,7 +1063,7 @@ Round-robin assignment is a server-side rule. It must be transactional and idemp
 { "reason": "Customer asked to stop messages" }
 ```
 
-`200 OK`; sets `opted_out = true`, pauses all automated follow-ups, and adds an audit/timeline event. Outbound message attempts return `403 opt_out`.
+`200 OK`; sets `opted_out = true`, records the opt-out timestamp and source, cancels open automated follow-up tasks, and adds an audit/timeline event. Outbound message attempts return `403 opt_out`; attempts without consent return `403 no_consent`.
 
 ### 8.7 Timeline
 
@@ -1164,6 +1164,7 @@ Rules:
 
 - Caller must have access to the conversation's lead.
 - `opted_out = true` → `403 opt_out`.
+- `consent = false` → `403 no_consent`.
 - Conversation closed → `409 conversation_closed` unless the caller reopens it (not in MVP).
 - The message is persisted and queued; the provider send happens in a background worker.
 - Provider message IDs and delivery status are updated by webhooks.
