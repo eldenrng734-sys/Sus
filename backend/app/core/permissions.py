@@ -18,6 +18,7 @@ from app.modules.users.models import User
 @dataclass(frozen=True)
 class PlatformAdminContext:
     """Verified identity for platform-level operations only."""
+
     user_id: uuid.UUID
     session_id: uuid.UUID
 

@@ -1,8 +1,8 @@
-"""Tenant context: who is calling, and which company are they acting for.
+"""Tenant context: who is calling, and which company they are acting for.
 
-Rules (API_CONTRACT 3.2, ARCHITECTURE 6):
+Rules:
 - X-Tenant-ID is only a request. An active membership is verified every time.
-- Verified ids are stored in the DB transaction with set_config(..., true).
+- Verified IDs are stored in the DB transaction with set_config(..., true).
 - The access token carries no role or tenant; everything is loaded fresh.
 """
 
@@ -29,25 +29,29 @@ TENANT_KEY = "app.tenant_id"
 
 
 def _set_context(session: Session, key: str, value: str) -> None:
-    """Remember the value on the session AND set it in the current transaction."""
+    """Remember the value on the session and set it in the current transaction."""
     session.info[key] = value
-    session.execute(text("SELECT set_config(:k, :v, true)"), {"k": key, "v": value})
+    session.execute(
+        text("SELECT set_config(:k, :v, true)"),
+        {"k": key, "v": value},
+    )
 
 
 @event.listens_for(Session, "after_begin")
 def _reapply_context(session, transaction, connection) -> None:
-    """A commit ends the transaction and clears the setting. Re-apply it at every
-    new transaction so later queries in the same request still carry the tenant.
-    A session with no verified context sets nothing, so RLS denies by default."""
+    """Reapply verified context whenever a new transaction begins."""
     for key in (USER_KEY, TENANT_KEY):
         value = session.info.get(key)
         if value:
-            connection.execute(text("SELECT set_config(:k, :v, true)"), {"k": key, "v": value})
+            connection.execute(
+                text("SELECT set_config(:k, :v, true)"),
+                {"k": key, "v": value},
+            )
 
 
 @dataclass(frozen=True)
 class TenantContext:
-    """Plain verified values (no ORM objects, so nothing expires after a commit)."""
+    """Verified values, without ORM objects."""
 
     user_id: uuid.UUID
     tenant_id: uuid.UUID
@@ -57,21 +61,37 @@ class TenantContext:
     session_id: uuid.UUID
 
 
-def _claims(authorization: str | None) -> tuple[uuid.UUID, uuid.UUID]:
+def _claims(
+    authorization: str | None,
+) -> tuple[uuid.UUID, uuid.UUID, list[str]]:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise AuthError(401, "unauthorized", "Missing or invalid access token")
+
     try:
         payload = decode_access_token(authorization[7:].strip())
         amr = payload.get("amr", ["pwd"])
+
         if not isinstance(amr, list) or not all(isinstance(item, str) for item in amr):
-            raise ValueError("invalid authentication methods")
-        return uuid.UUID(payload["sub"]), uuid.UUID(payload["sid"]), amr
+            raise ValueError("Invalid authentication methods")
+
+        return (
+            uuid.UUID(payload["sub"]),
+            uuid.UUID(payload["sid"]),
+            amr,
+        )
     except (jwt.PyJWTError, ValueError, KeyError) as exc:
-        raise AuthError(401, "unauthorized", "Missing or invalid access token") from exc
+        raise AuthError(
+            401,
+            "unauthorized",
+            "Missing or invalid access token",
+        ) from exc
 
 
 def _check_user_and_session(
-    session: Session, user_id: uuid.UUID, session_id: uuid.UUID, amr: list[str]
+    session: Session,
+    user_id: uuid.UUID,
+    session_id: uuid.UUID,
+    amr: list[str],
 ) -> None:
     # app.user_id lets the pre-tenant RLS policies find this user's own memberships.
     _set_context(session, USER_KEY, str(user_id))
@@ -79,9 +99,10 @@ def _check_user_and_session(
     user = session.get(User, user_id)
     if user is None or not user.is_active:
         raise AuthError(401, "unauthorized", "Missing or invalid access token")
+
     require_mfa_access(session, user, amr)
 
-    # sid = the refresh-token family. Logout or reuse detection revokes all of it.
+    # The token's session family must still have a live refresh token.
     live = session.scalar(
         select(RefreshToken.id)
         .where(
@@ -92,6 +113,7 @@ def _check_user_and_session(
         )
         .limit(1)
     )
+
     if live is None:
         raise AuthError(401, "unauthorized", "Session is no longer valid")
 
@@ -105,10 +127,15 @@ def get_tenant_context(
 
     if not x_tenant_id:
         raise AuthError(400, "bad_request", "X-Tenant-ID header is required")
+
     try:
         tenant_id = uuid.UUID(x_tenant_id)
     except ValueError as exc:
-        raise AuthError(400, "bad_request", "X-Tenant-ID must be a UUID") from exc
+        raise AuthError(
+            400,
+            "bad_request",
+            "X-Tenant-ID must be a UUID",
+        ) from exc
 
     _check_user_and_session(session, user_id, session_id, amr)
 
@@ -119,16 +146,36 @@ def get_tenant_context(
             TenantMembership.is_active.is_(True),
         )
     )
+
     if membership is None:
-        raise AuthError(403, "forbidden", "You do not have access to this company")
+        raise AuthError(
+            403,
+            "forbidden",
+            "You do not have access to this company",
+        )
 
     tenant = session.get(Tenant, tenant_id)
+
     if tenant is None:
-        raise AuthError(403, "forbidden", "You do not have access to this company")
+        raise AuthError(
+            403,
+            "forbidden",
+            "You do not have access to this company",
+        )
+
     if tenant.status == "suspended":
-        raise AuthError(403, "tenant_suspended", "This company is suspended")
+        raise AuthError(
+            403,
+            "tenant_suspended",
+            "This company is suspended",
+        )
+
     if tenant.status != "active":
-        raise AuthError(403, "forbidden", "You do not have access to this company")
+        raise AuthError(
+            403,
+            "forbidden",
+            "You do not have access to this company",
+        )
 
     context = TenantContext(
         user_id=user_id,
@@ -138,6 +185,8 @@ def get_tenant_context(
         team_id=membership.team_id,
         session_id=session_id,
     )
-    # Only now, after every check passed, is the tenant set for this request.
+
+    # Set tenant context only after all authorization checks pass.
     _set_context(session, TENANT_KEY, str(tenant_id))
+
     return context

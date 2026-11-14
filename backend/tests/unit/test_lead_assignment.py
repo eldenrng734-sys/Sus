@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -62,10 +62,7 @@ def test_assign_lead_success_creates_audit_and_timeline():
 
     added = [call.args[0] for call in session.add.call_args_list]
     assert any(isinstance(item, Interaction) for item in added)
-    assert any(
-        isinstance(item, AuditLog) and item.action == "lead.assigned"
-        for item in added
-    )
+    assert any(isinstance(item, AuditLog) and item.action == "lead.assigned" for item in added)
 
 
 def test_assign_lead_rejects_missing_lead():
