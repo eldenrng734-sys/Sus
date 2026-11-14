@@ -348,6 +348,32 @@ def test_get_lead_includes_latest_assessment_by_default():
     assert result["latest_assessment"] is None
 
 
+def test_get_lead_exposes_persisted_model_and_prompt_version():
+    session = MagicMock()
+    context = make_context()
+    lead = make_lead(context)
+    assessment = SimpleNamespace(
+        id=uuid.uuid4(),
+        intent="request_demo",
+        priority="high",
+        lead_score=80,
+        confidence=0.9,
+        needs_human_review=False,
+        review_status="not_required",
+        status="ok",
+        summary="Requests a demo",
+        model="provider/model-v1",
+        prompt_version="lead-assessment-v1",
+        created_at=datetime.now(UTC),
+    )
+    session.scalar.side_effect = [lead, assessment]
+
+    result = crud.get_lead(session, context, lead.id)
+
+    assert result["latest_assessment"]["model"] == "provider/model-v1"
+    assert result["latest_assessment"]["prompt_version"] == "lead-assessment-v1"
+
+
 def test_get_lead_rejects_unknown_expansion():
     session = MagicMock()
     context = make_context()
@@ -454,4 +480,3 @@ def test_rep_cannot_reopen_lost_lead():
 
     assert exc.value.status_code == 403
     session.rollback.assert_called_once()
-

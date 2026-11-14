@@ -324,6 +324,8 @@ Example message: *"I need a CRM for my 20-person sales team. Please arrange a de
 
 **Flow:** get permitted history → redact unnecessary PII → structured prompt → validate with Pydantic → save with model + prompt version → deterministic rules decide tasks and approval.
 
+- The backend AI service redacts supplied lead identifiers plus email/phone patterns, builds a versioned prompt input, validates structured assessment output, and persists only redacted validated output with the model and prompt version.
+- The hosted LLM adapter and durable assessment-job worker are not wired yet; the service is provider-neutral and does not send data to an external provider by itself.
 - The LLM never modifies data, assigns permissions or sends messages directly.
 - Low confidence (e.g. < 0.6) → mark for human review.
 - Bangla and English are both supported and both included in the evaluation set.
