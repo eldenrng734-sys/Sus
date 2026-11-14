@@ -2,7 +2,14 @@ import re
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 LeadSource = Literal[
     "website_form",
@@ -15,7 +22,14 @@ LeadSource = Literal[
 ]
 LeadStatus = Literal["new", "contacted", "qualified", "proposal", "won", "lost"]
 LeadPriority = Literal["low", "medium", "high"]
-LostReason = Literal["price", "timing", "no_response", "competitor", "not_qualified", "other"]
+LostReason = Literal[
+    "price",
+    "timing",
+    "no_response",
+    "competitor",
+    "not_qualified",
+    "other",
+]
 
 
 class LeadAssignRequest(BaseModel):
@@ -36,17 +50,22 @@ class LeadAutoAssignRequest(BaseModel):
 def _clean_phone(value: str | None) -> str | None:
     if value is None:
         return None
+
     raw = value.strip()
     if not re.fullmatch(r"[0-9+\s().-]+", raw):
         raise ValueError("Phone number contains unsupported characters")
+
     cleaned = re.sub(r"[^0-9+]", "", raw)
     if not cleaned:
         return None
+
     if cleaned.count("+") > 1 or ("+" in cleaned and not cleaned.startswith("+")):
         raise ValueError("Phone number may contain one leading + only")
+
     digits = cleaned[1:] if cleaned.startswith("+") else cleaned
     if not digits.isdigit() or not 7 <= len(digits) <= 15:
         raise ValueError("Phone number must contain between 7 and 15 digits")
+
     return cleaned
 
 
@@ -88,10 +107,13 @@ class LeadCreate(BaseModel):
     def need_contact_and_valid_name(self):
         if not self.name.strip():
             raise ValueError("Name cannot be blank")
+
         if not self.email and not self.phone:
             raise ValueError("Provide an email or a phone number")
+
         if self.external_id is not None and not self.external_id:
             raise ValueError("external_id cannot be blank")
+
         return self
 
 
@@ -103,10 +125,6 @@ class LeadUpdate(BaseModel):
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=32)
     company_name: str | None = Field(default=None, max_length=200)
-    priority: Literal["low", "medium", "high"] | None = None
-    status: Literal["new", "contacted", "qualified", "proposal", "won", "lost"] | None = None
-    lost_reason: str | None = None
-    reopen_reason: str | None = Field(default=None, max_length=500)
     priority: LeadPriority | None = None
     status: LeadStatus | None = None
     lost_reason: LostReason | None = None
@@ -122,7 +140,6 @@ class LeadUpdate(BaseModel):
     @field_validator("email")
     @classmethod
     def lower_email(cls, value):
-        return value.strip().lower() if value else None
         return _lower_email(value)
 
     @field_validator("phone")
@@ -133,14 +150,19 @@ class LeadUpdate(BaseModel):
     @model_validator(mode="after")
     def validate_patch(self):
         changed = self.model_fields_set - {"version", "reopen_reason"}
+
         if not changed:
             raise ValueError("Provide at least one field to update")
+
         if "name" in self.model_fields_set and (self.name is None or not self.name.strip()):
             raise ValueError("Name cannot be blank")
+
         if self.lost_reason is not None and self.status != "lost":
             raise ValueError("lost_reason may only be supplied when status is lost")
+
         if self.reopen_reason is not None and self.status != "contacted":
             raise ValueError("reopen_reason may only be supplied when reopening to contacted")
+
         return self
 
 

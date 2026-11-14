@@ -2,14 +2,24 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Query, Request, Response
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_any_member, require_manager_or_admin
 from app.core.tenancy import TenantContext
 from app.database.session import get_session
 from app.modules.auth.errors import AuthError
-from app.modules.leads import crud, service
+from app.modules.leads import crud, csv_import, service
 from app.modules.leads.schemas import (
     LeadAssignRequest,
     LeadAutoAssignRequest,
@@ -33,6 +43,41 @@ def post_lead(
     if replay:
         response.headers["Idempotent-Replay"] = "true"
     return {"data": data}
+
+
+@router.post("/import", status_code=200)
+def import_leads(
+    context: Annotated[TenantContext, Depends(require_manager_or_admin)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
+    file: Annotated[UploadFile, File()],
+    dry_run: Annotated[bool, Form()] = False,
+    session: Session = Depends(get_session),
+) -> dict:
+    filename = (file.filename or "").lower()
+
+    if not filename.endswith(".csv") and file.content_type not in {
+        "text/csv",
+        "text/plain",
+    }:
+        raise AuthError(
+            415,
+            "unsupported_media_type",
+            "Upload a .csv file",
+        )
+
+    raw = file.file.read(csv_import.MAX_BYTES + 1)
+
+    try:
+        data = csv_import.import_csv(
+            session=session,
+            ctx=context,
+            raw=raw,
+            dry_run=dry_run,
+            idempotency_key=idempotency_key,
+        )
+        return {"data": data}
+    finally:
+        file.file.close()
 
 
 @router.get("")

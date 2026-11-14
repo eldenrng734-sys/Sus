@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-# -----------------------------------------------------------------
 from app.core.config import settings
 from app.core.security import hash_password
 from app.database.session import get_session
