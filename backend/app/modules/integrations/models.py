@@ -185,4 +185,3 @@ def record_event(
         .returning(WebhookEvent.id)
     )
     return session.execute(stmt).scalar_one_or_none()
-
