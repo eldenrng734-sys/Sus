@@ -1,7 +1,16 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import INET, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 

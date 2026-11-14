@@ -1,7 +1,6 @@
+﻿"use client";
 
-"use client";
-
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 
@@ -13,16 +12,18 @@ type AcceptResponse = {
 
 export default function AcceptInvitePage() {
   const router = useRouter();
-  const [token, setToken] = useState("");
+  const [token] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+
+    return new URLSearchParams(window.location.search).get("token") || "";
+  });
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setToken(new URLSearchParams(window.location.search).get("token") || "");
-  }, []);
 
   async function handleAccept(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

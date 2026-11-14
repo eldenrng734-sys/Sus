@@ -1,14 +1,14 @@
-﻿from types import SimpleNamespace
-from unittest.mock import MagicMock
 import uuid
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
+from app.modules.audit.models import AuditLog
 from app.modules.auth.errors import AuthError
 from app.modules.leads import service
-from app.modules.leads.schemas import LeadAssignRequest
-from app.modules.audit.models import AuditLog
 from app.modules.leads.models import Interaction
+from app.modules.leads.schemas import LeadAssignRequest
 
 
 def make_context(role="admin", team_id=None):
@@ -27,6 +27,7 @@ def make_lead(context):
         assigned_user_id=None,
         team_id=None,
         status="new",
+        version=1,
     )
 
 
@@ -55,15 +56,13 @@ def test_assign_lead_success_creates_audit_and_timeline():
     assert result["team_id"] == str(body.team_id)
     assert lead.assigned_user_id == body.assigned_user_id
     assert lead.team_id == body.team_id
+    assert lead.version == 2
     session.commit.assert_called_once()
     session.refresh.assert_called_once_with(lead)
 
     added = [call.args[0] for call in session.add.call_args_list]
     assert any(isinstance(item, Interaction) for item in added)
-    assert any(
-        isinstance(item, AuditLog) and item.action == "lead.assigned"
-        for item in added
-    )
+    assert any(isinstance(item, AuditLog) and item.action == "lead.assigned" for item in added)
 
 
 def test_assign_lead_rejects_missing_lead():
@@ -82,13 +81,13 @@ def test_assign_lead_rejects_missing_lead():
 def test_manager_cannot_assign_lead_outside_own_team():
     context = make_context(role="manager", team_id=uuid.uuid4())
     session = MagicMock()
-    lead = make_lead(context)
-    lead.team_id = uuid.uuid4()
     body = make_body()
-    session.scalar.return_value = lead
+    # The real query applies the manager's team scope before loading the lead.
+    session.scalar.return_value = None
+    lead_id = uuid.uuid4()
 
     with pytest.raises(AuthError) as exc:
-        service.assign_lead(session, context, lead.id, body)
+        service.assign_lead(session, context, lead_id, body)
 
-    assert exc.value.status_code == 403
+    assert exc.value.status_code == 404
     session.commit.assert_not_called()

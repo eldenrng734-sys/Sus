@@ -17,6 +17,7 @@ from app.modules.conversations.schemas import (
     TimelineEvent,
 )
 from app.modules.leads.models import Interaction, Lead
+from app.modules.leads.optout import can_message
 
 # messages.provider only allows these two (see the DB check constraint)
 MESSAGE_CHANNELS = ("whatsapp", "messenger")
@@ -139,8 +140,11 @@ def send_message(session: Session, context: TenantContext, body: MessageCreate) 
             422, "validation_error", "Messages are only supported on WhatsApp and Messenger"
         )
     lead = _get_lead(session, context, conversation.lead_id)
-    if lead.opted_out:
-        raise AuthError(409, "conflict", "This lead has opted out of messages")
+    allowed, reason = can_message(lead)
+    if not allowed:
+        if reason == "opt_out":
+            raise AuthError(403, "opt_out", "This lead has opted out of messages")
+        raise AuthError(403, "no_consent", "This lead has not consented to messages")
 
     message = Message(
         tenant_id=context.tenant_id,
@@ -190,10 +194,17 @@ def get_timeline(
         .limit(fetch)
     ).all()
 
+    interaction_types = {
+        "note": "note_added",
+        "status_change": "status_changed",
+        "assignment": "assigned",
+        "assigned": "assigned",
+        "conversation_started": "integration_event",
+    }
     events = [
         TimelineEvent(
             kind="interaction",
-            type=i.type,
+            type=interaction_types.get(i.type, i.type),
             at=i.occurred_at,
             summary=i.source,
             details=i.details,
@@ -204,7 +215,7 @@ def get_timeline(
         events.append(
             TimelineEvent(
                 kind="message",
-                type=f"message_{message.direction}",
+                type="message_received" if message.direction == "inbound" else "message_sent",
                 at=message.created_at,
                 summary=(message.message_text or "")[:100],
                 details={

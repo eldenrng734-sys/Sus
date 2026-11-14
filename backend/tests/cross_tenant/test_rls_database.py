@@ -5,8 +5,9 @@ from sqlalchemy.exc import DBAPIError
 
 from tests.cross_tenant.support import read_dotenv, rls_pending, set_tenant
 
-# refresh_tokens runs before a tenant exists, so it has no tenant policy (DATABASE_SCHEMA 13).
-SPECIAL_TABLES = {"refresh_tokens"}
+# These tables use purpose-specific policies instead of the standard tenant GUC policy:
+# refresh_tokens is pre-tenant; lead_forms exposes active public forms by public ID.
+SPECIAL_TABLES = {"refresh_tokens", "lead_forms"}
 
 TENANT_TABLES_SQL = """
 SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity
@@ -24,7 +25,6 @@ def _visible_leads(engine, tenant_id=None) -> set[str]:
         return {str(row[0]) for row in conn.execute(text("SELECT id FROM leads"))}
 
 
-@rls_pending
 def test_every_tenant_table_has_forced_rls_and_a_tenant_policy(admin_engine):
     with admin_engine.connect() as conn:
         tables = [
@@ -48,7 +48,6 @@ def test_every_tenant_table_has_forced_rls_and_a_tenant_policy(admin_engine):
     assert not no_policy, f"No app.tenant_id policy on: {no_policy}"
 
 
-@rls_pending
 def test_crm_app_role_cannot_bypass_rls(admin_engine):
     with admin_engine.connect() as conn:
         row = conn.execute(

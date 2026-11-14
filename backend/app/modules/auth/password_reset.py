@@ -5,11 +5,8 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-# -----------------------------------------------------------------
 from app.core.config import settings
 from app.core.security import hash_password
-
-# ---- ADAPT THESE THREE IMPORTS to the names found in Step 1 ----
 from app.database.session import get_session
 from app.modules.auth import tokens
 from app.modules.auth.emails import send_password_reset_email, send_verification_email

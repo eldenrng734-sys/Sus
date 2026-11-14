@@ -10,8 +10,10 @@ from app.modules.auth.errors import AuthError
 from app.modules.auth.password_reset import router as password_reset_router
 from app.modules.auth.router import router as auth_router
 from app.modules.conversations.router import router as conversations_router
-from app.modules.teams.router import router as teams_router
+from app.modules.integrations.webhook_router import router as webhook_router
+from app.modules.lead_forms.router import router as lead_forms_router
 from app.modules.leads.router import router as leads_router
+from app.modules.teams.router import router as teams_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api.request")
@@ -38,7 +40,10 @@ async def request_context_middleware(request: Request, call_next):
         response.headers["X-Request-ID"] = request_id
         return response
     finally:
-        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        duration_ms = round(
+            (time.perf_counter() - start_time) * 1000,
+            2,
+        )
         logger.info(
             "api_request",
             extra={
@@ -58,7 +63,12 @@ def error_response(
     message: str,
     details: list | None = None,
 ) -> JSONResponse:
-    request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
+    request_id = getattr(
+        request.state,
+        "request_id",
+        str(uuid.uuid4()),
+    )
+
     return JSONResponse(
         status_code=status_code,
         headers={"X-Request-ID": request_id},
@@ -81,12 +91,21 @@ def health() -> dict[str, str]:
 app.include_router(auth_router)
 app.include_router(password_reset_router)
 app.include_router(conversations_router)
-app.include_router(teams_router)
+app.include_router(lead_forms_router)
 app.include_router(leads_router)
+app.include_router(teams_router)
+app.include_router(webhook_router)
+
 
 @app.exception_handler(AuthError)
 async def auth_error_handler(request: Request, exc: AuthError):
-    return error_response(request, exc.status_code, exc.code, exc.message)
+    return error_response(
+        request,
+        exc.status_code,
+        exc.code,
+        exc.message,
+        details=exc.details,
+    )
 
 
 @app.exception_handler(HTTPException)
@@ -104,12 +123,25 @@ async def http_error_handler(request: Request, exc: HTTPException):
         502: ("provider_error", "Provider error"),
         503: ("service_unavailable", "Service unavailable"),
     }
-    code, message = messages.get(exc.status_code, ("bad_request", "Request failed"))
-    return error_response(request, exc.status_code, code, message)
+
+    code, message = messages.get(
+        exc.status_code,
+        ("bad_request", "Request failed"),
+    )
+
+    return error_response(
+        request,
+        exc.status_code,
+        code,
+        message,
+    )
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_error_handler(request: Request, exc: RequestValidationError):
+async def validation_error_handler(
+    request: Request,
+    exc: RequestValidationError,
+):
     details = [
         {
             "field": ".".join(str(part) for part in error["loc"] if part != "body"),
@@ -118,17 +150,35 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
         }
         for error in exc.errors()
     ]
+
     return error_response(
-        request, 422, "validation_error", "Request validation failed", details
+        request,
+        422,
+        "validation_error",
+        "Request validation failed",
+        details,
     )
 
 
 @app.exception_handler(Exception)
-async def unexpected_error_handler(request: Request, exc: Exception):
+async def unexpected_error_handler(
+    request: Request,
+    exc: Exception,
+):
     logger.exception(
         "unhandled_api_error",
-        extra={"request_id": getattr(request.state, "request_id", None)},
+        extra={
+            "request_id": getattr(
+                request.state,
+                "request_id",
+                None,
+            )
+        },
     )
+
     return error_response(
-        request, 500, "internal_error", "An unexpected error occurred"
+        request,
+        500,
+        "internal_error",
+        "An unexpected error occurred",
     )
