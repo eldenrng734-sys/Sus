@@ -107,7 +107,10 @@ def apply_opt_out(
             session,
             action="lead.opted_out",
             actor_type=(
-                "user" if actor_user_id else "automation" if source in {"whatsapp", "messenger"}
+                "user"
+                if actor_user_id
+                else "automation"
+                if source in {"whatsapp", "messenger"}
                 else "system"
             ),
             tenant_id=lead.tenant_id,

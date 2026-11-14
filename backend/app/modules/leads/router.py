@@ -26,9 +26,7 @@ def post_lead(
     body: LeadCreate,
     response: Response,
     context: Annotated[TenantContext, Depends(require_any_member)],
-    idempotency_key: Annotated[
-        str, Header(alias="Idempotency-Key", min_length=8, max_length=128)
-    ],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
     session: Session = Depends(get_session),
 ) -> dict:
     data, replay = crud.create_lead(session, context, body, idempotency_key)

@@ -35,9 +35,7 @@ class Lead(UUIDPkMixin, TimestampMixin, Base):
     phone: Mapped[str | None] = mapped_column(String(32))
     company_name: Mapped[str | None] = mapped_column(String(200))
 
-    source: Mapped[str] = mapped_column(
-        String(50), nullable=False, server_default=text("'manual'")
-    )
+    source: Mapped[str] = mapped_column(String(50), nullable=False, server_default=text("'manual'"))
     source_campaign: Mapped[str | None] = mapped_column(String(200))
     external_id: Mapped[str | None] = mapped_column(String(200))
 

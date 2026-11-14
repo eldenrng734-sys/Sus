@@ -129,9 +129,7 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
         }
         for error in exc.errors()
     ]
-    return error_response(
-        request, 422, "validation_error", "Request validation failed", details
-    )
+    return error_response(request, 422, "validation_error", "Request validation failed", details)
 
 
 @app.exception_handler(Exception)
@@ -140,6 +138,4 @@ async def unexpected_error_handler(request: Request, exc: Exception):
         "unhandled_api_error",
         extra={"request_id": getattr(request.state, "request_id", None)},
     )
-    return error_response(
-        request, 500, "internal_error", "An unexpected error occurred"
-    )
+    return error_response(request, 500, "internal_error", "An unexpected error occurred")
