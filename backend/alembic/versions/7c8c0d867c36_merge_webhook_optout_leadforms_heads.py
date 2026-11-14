@@ -1,7 +1,7 @@
 """merge_webhook_optout_leadforms_heads
 
 Revision ID: 7c8c0d867c36
-Revises: a1b2c3d4e5f6, d7b1f4a6c802, f4a91c6d2b37
+Revises: d7b1f4a6c802, f4a91c6d2b37
 Create Date: 2026-11-14 04:31:12.548495
 
 """

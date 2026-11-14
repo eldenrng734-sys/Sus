@@ -89,8 +89,9 @@ def test_repeated_assessment_uses_same_deduplication_key():
     assert session.execute.call_count == 2
     first_insert = session.execute.call_args_list[0].args[0]
     second_insert = session.execute.call_args_list[1].args[0]
-    assert first_insert.compile(dialect=postgresql.dialect()).params["idempotency_key"] == (
-        second_insert.compile(dialect=postgresql.dialect()).params["idempotency_key"]
+    assert (
+        first_insert.compile(dialect=postgresql.dialect()).params["idempotency_key"]
+        == (second_insert.compile(dialect=postgresql.dialect()).params["idempotency_key"])
     )
 
 

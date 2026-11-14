@@ -16,6 +16,7 @@ class AssessmentSignals(Protocol):
     sentiment: str | None
     confidence: float | None
 
+
 INTENT_POINTS = {
     "request_demo": 35,
     "pricing": 30,

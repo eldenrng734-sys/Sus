@@ -1,4 +1,3 @@
-
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
@@ -11,10 +10,7 @@ from app.database.base import Base
 config = context.config
 
 # Select the migration URL explicitly.
-database_url = (
-    getattr(settings, "migration_database_url", "")
-    or settings.database_url
-)
+database_url = getattr(settings, "migration_database_url", "") or settings.database_url
 
 config.set_main_option(
     "sqlalchemy.url",

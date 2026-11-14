@@ -161,8 +161,7 @@ def analyze_conversation(
         )
     )
     content = [
-        f"{'Customer' if message.direction == 'inbound' else 'Agent'}: "
-        f"{message.message_text}"
+        f"{'Customer' if message.direction == 'inbound' else 'Agent'}: {message.message_text}"
         for message in reversed(messages)
         if message.message_text and message.message_text.strip()
     ]
@@ -173,10 +172,7 @@ def analyze_conversation(
         _bounded_conversation(content),
         pii_values=(lead.name, lead.email or "", lead.phone or ""),
     )
-    if (
-        settings.openai_api_key is None
-        or not settings.openai_api_key.get_secret_value().strip()
-    ):
+    if settings.openai_api_key is None or not settings.openai_api_key.get_secret_value().strip():
         raise AuthError(503, "service_unavailable", "AI conversation analysis is not configured")
 
     api_key = settings.openai_api_key.get_secret_value()

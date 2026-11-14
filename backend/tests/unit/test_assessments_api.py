@@ -136,9 +136,9 @@ def test_get_assessment_details(api_client):
     assert response.status_code == 200
     assert response.json()["data"]["summary"] == assessment.summary
     assert "raw_output" not in response.json()["data"]
-    assert context.tenant_id in session.statement.compile(
-        dialect=postgresql.dialect()
-    ).params.values()
+    assert (
+        context.tenant_id in session.statement.compile(dialect=postgresql.dialect()).params.values()
+    )
 
 
 @pytest.mark.parametrize("review_status", ["approved", "rejected"])

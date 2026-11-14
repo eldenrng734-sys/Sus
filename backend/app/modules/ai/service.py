@@ -29,17 +29,18 @@ class AssessmentOutput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, str_strip_whitespace=True)
 
     category: Literal["business_customer", "individual", "partner", "spam", "unknown"] | None = None
-    intent: Literal[
-        "request_demo", "pricing", "support", "info", "complaint", "other", "unknown"
-    ] | None = None
+    intent: (
+        Literal["request_demo", "pricing", "support", "info", "complaint", "other", "unknown"]
+        | None
+    ) = None
     interest: str | None = Field(default=None, max_length=1000)
     buying_stage: Literal["awareness", "consideration", "decision", "unknown"] | None = None
     sentiment: Literal["positive", "neutral", "negative"] | None = None
     priority: Literal["low", "medium", "high"] | None = None
     lead_score: int | None = Field(default=None, ge=0, le=100)
-    recommended_action: Literal[
-        "call", "schedule_demo", "email", "follow_up", "support", "none"
-    ] | None = None
+    recommended_action: (
+        Literal["call", "schedule_demo", "email", "follow_up", "support", "none"] | None
+    ) = None
     follow_up_days: int | None = Field(default=None, ge=0, le=365)
     confidence: FiniteFloat | None = Field(default=None, ge=0, le=1)
     summary: str | None = Field(default=None, max_length=4000)
