@@ -27,7 +27,7 @@ def verify_webhook(
     if provider not in webhooks.PROVIDERS:
         raise AuthError(404, "not_found", "Unknown provider")
 
-    result = webhooks.verify_challenge(mode, token, challenge)
+    result = webhooks.verify_challenge(mode, token, challenge, provider=provider)
     return PlainTextResponse(result)
 
 
@@ -60,8 +60,7 @@ async def receive_webhook(
             "Webhook body is too large",
         )
 
-    result = await run_in_threadpool(
-        webhooks.receive,
+    result = await webhooks.receive(
         session,
         provider,
         raw_body,

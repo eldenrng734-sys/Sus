@@ -5,8 +5,8 @@ from sqlalchemy.exc import DBAPIError
 
 from tests.cross_tenant.support import read_dotenv, rls_pending, set_tenant
 
-# refresh_tokens runs before a tenant exists, so it has no tenant policy (DATABASE_SCHEMA 13).
-SPECIAL_TABLES = {"refresh_tokens"}
+# refresh_tokens and lead_forms resolve before tenant context exists (public endpoints)
+SPECIAL_TABLES = {"refresh_tokens", "lead_forms"}
 
 TENANT_TABLES_SQL = """
 SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity

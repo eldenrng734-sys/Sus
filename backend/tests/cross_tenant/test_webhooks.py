@@ -22,9 +22,11 @@ URL = "/api/v1/webhooks/whatsapp"
 
 @pytest.fixture(scope="module", autouse=True)
 def _secrets():
+    from pydantic import SecretStr
+
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(settings, "whatsapp_app_secret", SECRET)
-        patch.setattr(settings, "webhook_verify_token", "verify-me")
+        patch.setattr(settings, "meta_app_secret", SecretStr(SECRET))
+        patch.setattr(settings, "webhook_verify_token", SecretStr("verify-me"))
         yield
 
 
@@ -104,9 +106,12 @@ def test_missing_signature_is_rejected(hook_client, account):
     assert _post(hook_client, _body(account, "wamid.x"), None).status_code == 401
 
 
-def test_unknown_account_is_forbidden(hook_client):
-    body = _body("pn-does-not-exist", "wamid.y")
-    assert _post(hook_client, body, _sig(body)).status_code == 403
+def test_unknown_account_returns_200_and_stores_nothing(hook_client, admin_engine, seed):
+    mid = "wamid." + uuid.uuid4().hex
+    body = _body("pn-does-not-exist", mid)
+    res = _post(hook_client, body, _sig(body))
+    assert res.status_code == 200
+    assert _count(admin_engine, seed, mid) == 0
 
 
 def test_malformed_json_with_valid_signature_is_400(hook_client):

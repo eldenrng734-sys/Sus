@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,12 +31,22 @@ class Settings(BaseSettings):
         "http://localhost:8000",
     ]
 
-    # Webhook verification secrets.
-    whatsapp_app_secret: str = ""
-    meta_app_secret: str = ""
-    webhook_verify_token: str = ""
-    cookie_secure: bool = False  # set COOKIE_SECURE=true in staging/production
-    allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
+    # -------------------------------------------------------------------------
+    # Meta / WhatsApp platform-level secrets (never per-tenant, never in DB)
+    # WhatsApp and Messenger/Lead Ads share the same Meta app secret.
+    # -------------------------------------------------------------------------
+    # HMAC key for all Meta webhook signatures (X-Hub-Signature-256).
+    meta_app_secret: SecretStr = SecretStr("")
+    # Token compared against hub.verify_token in GET handshake challenges.
+    webhook_verify_token: SecretStr = SecretStr("")
+    # Graph API version — set in env, never hardcoded in business logic.
+    meta_graph_version: str = "v21.0"
+
+    # AES-256-GCM key for encrypting per-tenant credentials in the DB.
+    # Must be a base64-encoded 32-byte value.  Generate with:
+    #   python -c "import os,base64; print(base64.b64encode(os.urandom(32)).decode())"
+    integration_encryption_key: SecretStr = SecretStr("")
+
     llm_api_key: str = ""
     llm_model: str = ""
     llm_base_url: str = "https://api.anthropic.com/v1/messages"
