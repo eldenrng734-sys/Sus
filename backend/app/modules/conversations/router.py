@@ -47,6 +47,24 @@ def list_messages(
     return {"data": data, "meta": {"limit": limit, "offset": offset}}
 
 
+@router.post("/conversations/{conversation_id}/analyze")
+def analyze_conversation(
+    conversation_id: uuid.UUID,
+    context: TenantContext = Depends(require_any_member),
+    session: Session = Depends(get_session),
+) -> dict:
+    return {"data": service.analyze_conversation(session, context, conversation_id)}
+
+
+@router.get("/conversations/{conversation_id}/analysis")
+def get_conversation_analysis(
+    conversation_id: uuid.UUID,
+    context: TenantContext = Depends(require_any_member),
+    session: Session = Depends(get_session),
+) -> dict:
+    return {"data": service.get_conversation_analysis(session, context, conversation_id)}
+
+
 @router.post("/messages", status_code=201)
 def send_message(
     body: MessageCreate,
