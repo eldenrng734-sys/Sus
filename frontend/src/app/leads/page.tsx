@@ -3,8 +3,8 @@
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
-  Search, Plus, Filter, Users, Download,
-  ArrowUpDown, X, UserPlus,
+  Search, Plus, Users, Download,
+  X, UserPlus,
 } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
 
@@ -285,7 +285,7 @@ export default function LeadsPage() {
               <div>
                 <h2 className="text-xl font-bold text-slate-900">Add New Lead</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Enter the customer's basic information.
+                  Enter the customer&apos;s basic information.
                 </p>
               </div>
               <button
