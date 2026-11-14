@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     whatsapp_app_secret: str = ""
     meta_app_secret: str = ""
     webhook_verify_token: str = ""
+    cookie_secure: bool = False  # set COOKIE_SECURE=true in staging/production
+    allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
+    llm_api_key: str = ""
+    llm_model: str = ""
+    llm_base_url: str = "https://api.anthropic.com/v1/messages"
+    llm_timeout_seconds: float = 20.0
+    llm_max_retries: int = 2
+    llm_input_price_per_mtok: float = 0.0
+    llm_output_price_per_mtok: float = 0.0
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[3] / ".env",
