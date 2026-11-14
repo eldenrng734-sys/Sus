@@ -1,13 +1,12 @@
-"""merge webhook and lead opt-out migrations
+"""Merge webhook and lead opt-out migration histories.
 
 Revision ID: c6452d0f8136
 Revises: a7d3c91e5b20, d7b1f4a6c802
-Create Date: 2026-11-14 09:53:12.893572
-
 """
 
 from typing import Sequence, Union
 
+from typing import Sequence, Union
 
 # revision identifiers, used by Alembic.
 revision: str = "c6452d0f8136"
@@ -17,10 +16,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
     pass
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
     pass

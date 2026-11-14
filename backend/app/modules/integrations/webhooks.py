@@ -7,6 +7,7 @@ Resolve the tenant exclusively through the registered integration.
 import hashlib
 import hmac
 import json
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
@@ -135,12 +136,12 @@ def _set_local(session: Session, key: str, value: str) -> None:
     )
 
 
-def _resolve_tenant(
+def _resolve_integration(
     session: Session,
     provider: str,
     account_id: str,
-):
-    """Resolve exactly one active integration before tenant context exists."""
+) -> tuple[uuid.UUID, uuid.UUID]:
+    """Resolve one active integration and its tenant before tenant context exists."""
 
     _set_local(session, "app.webhook_provider", provider)
     _set_local(session, "app.webhook_account_id", account_id)
@@ -167,7 +168,7 @@ def _resolve_tenant(
             "Unknown provider account",
         )
 
-    return rows[0].tenant_id
+    return rows[0].id, rows[0].tenant_id
 
 
 def receive(
@@ -212,18 +213,18 @@ def receive(
 
     stored = 0
     duplicates = 0
-    tenants: dict[str, Any] = {}
+    integrations: dict[str, tuple[uuid.UUID, uuid.UUID]] = {}
 
     try:
         for event in events:
-            if event.account_id not in tenants:
-                tenants[event.account_id] = _resolve_tenant(
+            if event.account_id not in integrations:
+                integrations[event.account_id] = _resolve_integration(
                     session,
                     provider,
                     event.account_id,
                 )
 
-            tenant_id = tenants[event.account_id]
+            integration_id, tenant_id = integrations[event.account_id]
 
             # Tenant comes only from the verified integration record.
             _set_local(session, "app.tenant_id", str(tenant_id))
@@ -232,11 +233,11 @@ def receive(
                 pg_insert(WebhookEvent)
                 .values(
                     tenant_id=tenant_id,
+                    integration_id=integration_id,
                     provider=provider,
                     event_id=event.event_id,
                     event_type=event.event_type,
                     payload=event.data,
-                    signature_valid=True,
                     status="received",
                 )
                 .on_conflict_do_nothing(

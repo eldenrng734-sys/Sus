@@ -182,7 +182,7 @@ def upgrade() -> None:
         )
         op.drop_column("integrations", "scopes")
         op.alter_column("integrations", "scopes_new", new_column_name="scopes", nullable=False)
-        op.execute("ALTER TABLE integrations ALTER COLUMN scopes SET DEFAULT '{}'")
+        op.execute("ALTER TABLE integrations ALTER COLUMN scopes SET DEFAULT '{}' ")
 
     # 6. Tighten String lengths.
     op.alter_column(
