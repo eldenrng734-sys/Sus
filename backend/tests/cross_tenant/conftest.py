@@ -1,8 +1,9 @@
 import uuid
 from collections.abc import Callable, Iterator
-from cryptography.fernet import Fernet
+
 import pyotp
 import pytest
+from cryptography.fernet import Fernet
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
@@ -30,7 +31,6 @@ from tests.cross_tenant.support import (
 NEEDED_TABLES = {"tenants", "users", "tenant_memberships", "teams", "leads", "refresh_tokens"}
 
 
-
 @pytest.fixture(scope="session", autouse=True)
 def _jwt_secret() -> Iterator[None]:
     with pytest.MonkeyPatch.context() as patch:
@@ -41,7 +41,6 @@ def _jwt_secret() -> Iterator[None]:
             Fernet.generate_key().decode(),
         )
         yield
-
 
 
 @pytest.fixture(scope="session")
@@ -125,7 +124,6 @@ def admin_client(make_client: Callable[[Engine], TestClient], admin_engine: Engi
     return make_client(admin_engine)
 
 
-
 @pytest.fixture(scope="session")
 def tokens(
     admin_client: TestClient,
@@ -143,17 +141,14 @@ def tokens(
                 "/api/v1/auth/login",
                 json={"email": email, "password": PASSWORD},
             )
-            assert response.status_code == 200, (
-                f"Login failed for {letter}/{key}: {response.text}"
-            )
+            assert response.status_code == 200, f"Login failed for {letter}/{key}: {response.text}"
 
             login_data = response.json()["data"]
 
             # Step 2: Admins must complete MFA before receiving a token.
             if role == "admin":
                 assert login_data.get("mfa_setup_required") is True, (
-                    f"Expected MFA enrollment for {letter}/{key}, "
-                    f"received: {login_data}"
+                    f"Expected MFA enrollment for {letter}/{key}, received: {login_data}"
                 )
 
                 challenge = login_data["challenge"]
@@ -164,8 +159,7 @@ def tokens(
                     json={"challenge": challenge},
                 )
                 assert setup_response.status_code == 200, (
-                    f"MFA setup failed for {letter}/{key}: "
-                    f"{setup_response.text}"
+                    f"MFA setup failed for {letter}/{key}: {setup_response.text}"
                 )
 
                 secret = setup_response.json()["data"]["secret"]
@@ -182,8 +176,7 @@ def tokens(
                     },
                 )
                 assert confirm_response.status_code == 200, (
-                    f"MFA confirmation failed for {letter}/{key}: "
-                    f"{confirm_response.text}"
+                    f"MFA confirmation failed for {letter}/{key}: {confirm_response.text}"
                 )
 
                 token = confirm_response.json()["data"]["access_token"]
@@ -192,9 +185,6 @@ def tokens(
                 # Managers and reps use the normal login response.
                 token = login_data["access_token"]
 
-            result[(letter, key)] = {
-                "Authorization": f"Bearer {token}"
-            }
+            result[(letter, key)] = {"Authorization": f"Bearer {token}"}
 
     return result
-

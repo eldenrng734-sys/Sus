@@ -214,8 +214,7 @@ def test_update_lead_checks_version_and_records_status_change():
         for item in added
     )
     assert any(
-        isinstance(item, AuditLog) and item.action == "lead.status_changed"
-        for item in added
+        isinstance(item, AuditLog) and item.action == "lead.status_changed" for item in added
     )
     session.commit.assert_called_once()
 
@@ -275,10 +274,7 @@ def test_add_note_persists_interaction_and_audit():
     assert result["text"] == "Customer requested a call"
     added = [call.args[0] for call in session.add.call_args_list]
     assert any(isinstance(item, Interaction) and item.type == "note" for item in added)
-    assert any(
-        isinstance(item, AuditLog) and item.action == "lead.note_added"
-        for item in added
-    )
+    assert any(isinstance(item, AuditLog) and item.action == "lead.note_added" for item in added)
     session.commit.assert_called_once()
 
 
@@ -287,6 +283,7 @@ def test_create_schema_requires_email_or_phone_and_valid_source():
         LeadCreate(name="Ayesha")
     with pytest.raises(ValueError):
         LeadCreate(name="Ayesha", email="a@example.com", source="unknown")
+
 
 def test_idempotency_key_replays_matching_request():
     context = make_context()
@@ -301,9 +298,7 @@ def test_idempotency_key_replays_matching_request():
     session = MagicMock()
     session.scalar.side_effect = [None, previous]
 
-    key_id, replay = crud._claim_create_idempotency(
-        session, context, key, request_hash
-    )
+    key_id, replay = crud._claim_create_idempotency(session, context, key, request_hash)
 
     assert key_id is None
     assert replay == previous.response_body
@@ -334,6 +329,7 @@ def test_request_hash_is_stable_for_normalized_schema_values():
     first = LeadCreate(name="Ayesha", email="AYESHA@example.com")
     second = LeadCreate(name="Ayesha", email="ayesha@example.com")
     assert crud._request_hash(first) == crud._request_hash(second)
+
 
 def test_get_lead_includes_latest_assessment_by_default():
     session = MagicMock()
@@ -385,6 +381,7 @@ def test_get_lead_rejects_unknown_expansion():
 
     assert exc.value.status_code == 422
 
+
 def test_duplicate_error_does_not_reveal_a_lead_outside_rep_scope():
     session = MagicMock()
     context = make_context(role="rep")
@@ -410,6 +407,7 @@ def test_phone_normalization_rejects_letters_and_accepts_common_formatting():
     with pytest.raises(ValueError):
         _clean_phone("call-me-01700000000")
 
+
 def test_update_lead_requires_lost_reason_and_records_it():
     session = MagicMock()
     context = make_context()
@@ -427,8 +425,7 @@ def test_update_lead_requires_lost_reason_and_records_it():
     assert result["lost_reason"] == "price"
     added = [call.args[0] for call in session.add.call_args_list]
     event = next(
-        item for item in added
-        if isinstance(item, Interaction) and item.type == "status_change"
+        item for item in added if isinstance(item, Interaction) and item.type == "status_change"
     )
     assert event.details["reason"] == "price"
 
@@ -454,8 +451,7 @@ def test_admin_can_reopen_lost_lead_with_a_reason():
     assert result["lost_reason"] is None
     added = [call.args[0] for call in session.add.call_args_list]
     event = next(
-        item for item in added
-        if isinstance(item, Interaction) and item.type == "status_change"
+        item for item in added if isinstance(item, Interaction) and item.type == "status_change"
     )
     assert event.details["reason"] == "Customer contacted us again"
 

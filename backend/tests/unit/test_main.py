@@ -83,6 +83,7 @@ def test_auth_error_handler_preserves_structured_details():
     assert response.status_code == 409
     assert payload["error"]["details"] == error.details
 
+
 def test_lead_list_rejects_unknown_query_filters():
     app.dependency_overrides[require_any_member] = lambda: MagicMock(
         tenant_id=uuid.uuid4(),

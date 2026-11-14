@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 import app.database.registry  # noqa: F401  (loads every model)
 from app.core.config import settings
+from app.modules.integrations.models import Integration
 from app.modules.tenants.models import Team, Tenant, TenantMembership
 from app.modules.users.models import User
 
@@ -63,7 +64,29 @@ def main() -> None:
             )
 
             if db.scalar(select(Tenant).where(Tenant.slug == c["slug"])):
-                print(f"skip   {c['slug']} (already exists)")
+                integ = db.scalar(
+                    select(Integration).where(
+                        Integration.tenant_id == tenant_id,
+                        Integration.provider == "whatsapp",
+                    )
+                )
+                if integ is None:
+                    db.add(
+                        Integration(
+                            id=seed_id("integration", c["slug"], "whatsapp"),
+                            tenant_id=tenant_id,
+                            provider="whatsapp",
+                            provider_account_id=f"wa_{c['slug']}_account",
+                            owner_user_id=None,
+                            scopes=["messages", "webhooks"],
+                            status="active",
+                            credentials_encrypted=None,
+                            key_version=1,
+                        )
+                    )
+                    print(f"seeded {c['slug']}: whatsapp integration")
+                else:
+                    print(f"skip   {c['slug']} (already exists)")
                 continue
 
             db.add(Tenant(id=tenant_id, name=c["name"], slug=c["slug"]))
@@ -98,9 +121,28 @@ def main() -> None:
                         role=role,
                     )
                 )
-            print(f"seeded {c['slug']}: {len(TEAM_NAMES)} teams, {len(PEOPLE)} users")
+            db.add(
+                Integration(
+                    id=seed_id("integration", c["slug"], "whatsapp"),
+                    tenant_id=tenant_id,
+                    provider="whatsapp",
+                    provider_account_id=f"wa_{c['slug']}_account",
+                    owner_user_id=None,
+                    scopes=["messages", "webhooks"],
+                    status="active",
+                    credentials_encrypted=None,
+                    key_version=1,
+                )
+            )
+            print(
+                f"seeded {c['slug']}: {len(TEAM_NAMES)} teams, "
+                f"{len(PEOPLE)} users, 1 whatsapp integration"
+            )
 
-    print("done. Dev login password is set by SEED_PASSWORD (default in this file); never use it in production.")
+    print(
+        "done. Dev login password is set by SEED_PASSWORD (default in this file); "
+        "never use it in production."
+    )
 
 
 if __name__ == "__main__":

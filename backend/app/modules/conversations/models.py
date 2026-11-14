@@ -62,6 +62,7 @@ class Conversation(UUIDPkMixin, TimestampMixin, Base):
     lead_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     channel: Mapped[str] = mapped_column(String(30), nullable=False)
     external_conversation_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_contact_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'open'"))
     assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -43,9 +43,9 @@ def create_team(session: Session, context, name: str) -> dict:
     try:
         session.commit()
         session.refresh(team)
-    except IntegrityError:
+    except IntegrityError as exc:
         session.rollback()
-        raise AuthError(409, "duplicate_name", "A team with this name already exists")
+        raise AuthError(409, "duplicate_name", "A team with this name already exists") from exc
 
     return _team_data(team)
 
@@ -75,8 +75,8 @@ def rename_team(session: Session, context, team_id, name: str) -> dict:
     try:
         session.commit()
         session.refresh(team)
-    except IntegrityError:
+    except IntegrityError as exc:
         session.rollback()
-        raise AuthError(409, "duplicate_name", "A team with this name already exists")
+        raise AuthError(409, "duplicate_name", "A team with this name already exists") from exc
 
     return _team_data(team)

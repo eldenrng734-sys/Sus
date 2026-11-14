@@ -1,3 +1,4 @@
+
 fastapi
 uvicorn[standard]
 sqlalchemy>=2.0
@@ -14,3 +15,4 @@ email-validator
 pyotp
 cryptography
 qrcode[pil]
+python-multipart
