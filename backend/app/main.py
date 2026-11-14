@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.modules.ai.router import router as assessments_router
 from app.modules.auth.errors import AuthError
 from app.modules.auth.password_reset import router as password_reset_router
 from app.modules.auth.router import router as auth_router
@@ -90,6 +91,7 @@ def health() -> dict[str, str]:
 
 app.include_router(auth_router)
 app.include_router(password_reset_router)
+app.include_router(assessments_router)
 app.include_router(conversations_router)
 app.include_router(lead_forms_router)
 app.include_router(leads_router)
