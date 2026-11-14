@@ -54,35 +54,41 @@ GUC = "NULLIF(current_setting('app.tenant_id', true), '')::uuid"
 
 
 def _col_exists(conn, table: str, col: str) -> bool:
-    return conn.execute(
-        sa.text(
-            "SELECT 1 FROM information_schema.columns "
-            "WHERE table_schema='public' AND table_name=:t AND column_name=:c"
-        ),
-        {"t": table, "c": col},
-    ).scalar() is not None
+    return (
+        conn.execute(
+            sa.text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema='public' AND table_name=:t AND column_name=:c"
+            ),
+            {"t": table, "c": col},
+        ).scalar()
+        is not None
+    )
 
 
 def _con_exists(conn, table: str, con: str) -> bool:
-    return conn.execute(
-        sa.text(
-            "SELECT 1 FROM pg_constraint c "
-            "JOIN pg_class t ON t.oid = c.conrelid "
-            "JOIN pg_namespace n ON n.oid = t.relnamespace "
-            "WHERE n.nspname = 'public' AND t.relname = :t AND c.conname = :c"
-        ),
-        {"t": table, "c": con},
-    ).scalar() is not None
+    return (
+        conn.execute(
+            sa.text(
+                "SELECT 1 FROM pg_constraint c "
+                "JOIN pg_class t ON t.oid = c.conrelid "
+                "JOIN pg_namespace n ON n.oid = t.relnamespace "
+                "WHERE n.nspname = 'public' AND t.relname = :t AND c.conname = :c"
+            ),
+            {"t": table, "c": con},
+        ).scalar()
+        is not None
+    )
 
 
 def _idx_exists(conn, idx: str) -> bool:
-    return conn.execute(
-        sa.text(
-            "SELECT 1 FROM pg_indexes "
-            "WHERE schemaname='public' AND indexname=:i"
-        ),
-        {"i": idx},
-    ).scalar() is not None
+    return (
+        conn.execute(
+            sa.text("SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname=:i"),
+            {"i": idx},
+        ).scalar()
+        is not None
+    )
 
 
 def _rls_up(table: str) -> None:
@@ -90,12 +96,10 @@ def _rls_up(table: str) -> None:
     op.execute(f'ALTER TABLE "{table}" ENABLE ROW LEVEL SECURITY')
     op.execute(f'ALTER TABLE "{table}" FORCE ROW LEVEL SECURITY')
     op.execute(
-        f"CREATE POLICY {table}_tenant_isolation ON \"{table}\" TO crm_app "
+        f'CREATE POLICY {table}_tenant_isolation ON "{table}" TO crm_app '
         f"USING (tenant_id = {GUC}) WITH CHECK (tenant_id = {GUC})"
     )
-    op.execute(
-        f'GRANT SELECT, INSERT, UPDATE, DELETE ON "{table}" TO crm_app'
-    )
+    op.execute(f'GRANT SELECT, INSERT, UPDATE, DELETE ON "{table}" TO crm_app')
 
 
 # ---------------------------------------------------------------------------
@@ -182,19 +186,22 @@ def upgrade() -> None:
 
     # 6. Tighten String lengths.
     op.alter_column(
-        "integrations", "provider",
+        "integrations",
+        "provider",
         existing_type=sa.String(50),
         type_=sa.String(32),
         existing_nullable=False,
     )
     op.alter_column(
-        "integrations", "provider_account_id",
+        "integrations",
+        "provider_account_id",
         existing_type=sa.String(200),
         type_=sa.String(128),
         existing_nullable=False,
     )
     op.alter_column(
-        "integrations", "status",
+        "integrations",
+        "status",
         existing_type=sa.String(20),
         type_=sa.String(16),
         existing_nullable=False,
@@ -248,7 +255,8 @@ def upgrade() -> None:
     # 4. Make event_type NOT NULL and tighten.
     op.execute("UPDATE webhook_events SET event_type = 'unknown' WHERE event_type IS NULL")
     op.alter_column(
-        "webhook_events", "event_type",
+        "webhook_events",
+        "event_type",
         existing_type=sa.String(100),
         type_=sa.String(32),
         nullable=False,
@@ -275,13 +283,15 @@ def upgrade() -> None:
 
     # 7. Tighten String lengths.
     op.alter_column(
-        "webhook_events", "provider",
+        "webhook_events",
+        "provider",
         existing_type=sa.String(50),
         type_=sa.String(32),
         existing_nullable=False,
     )
     op.alter_column(
-        "webhook_events", "status",
+        "webhook_events",
+        "status",
         existing_type=sa.String(20),
         type_=sa.String(16),
         existing_nullable=False,
@@ -322,7 +332,7 @@ def upgrade() -> None:
             policy_name = f"{table}_tenant_isolation"
             if policy_name not in existing_policies:
                 op.execute(
-                    f"CREATE POLICY {policy_name} ON \"{table}\" TO crm_app "
+                    f'CREATE POLICY {policy_name} ON "{table}" TO crm_app '
                     f"USING (tenant_id = {GUC}) WITH CHECK (tenant_id = {GUC})"
                 )
             op.execute(f'GRANT SELECT, INSERT, UPDATE, DELETE ON "{table}" TO crm_app')
@@ -369,13 +379,15 @@ def downgrade() -> None:
     # webhook_events                                                     #
     # ------------------------------------------------------------------ #
     op.alter_column(
-        "webhook_events", "status",
+        "webhook_events",
+        "status",
         existing_type=sa.String(16),
         type_=sa.String(20),
         existing_nullable=False,
     )
     op.alter_column(
-        "webhook_events", "provider",
+        "webhook_events",
+        "provider",
         existing_type=sa.String(32),
         type_=sa.String(50),
         existing_nullable=False,
@@ -399,7 +411,8 @@ def downgrade() -> None:
         )
 
     op.alter_column(
-        "webhook_events", "event_type",
+        "webhook_events",
+        "event_type",
         existing_type=sa.String(32),
         type_=sa.String(100),
         nullable=True,
@@ -410,7 +423,9 @@ def downgrade() -> None:
             "webhook_events",
             sa.Column("signature_valid", sa.Boolean(), nullable=True),
         )
-        op.execute("UPDATE webhook_events SET signature_valid = false WHERE signature_valid IS NULL")
+        op.execute(
+            "UPDATE webhook_events SET signature_valid = false WHERE signature_valid IS NULL"
+        )
         op.alter_column("webhook_events", "signature_valid", nullable=False)
 
     if _col_exists(conn, "webhook_events", "attempts"):
@@ -430,19 +445,22 @@ def downgrade() -> None:
         op.drop_index("ix_integrations_tenant_provider", table_name="integrations")
 
     op.alter_column(
-        "integrations", "status",
+        "integrations",
+        "status",
         existing_type=sa.String(16),
         type_=sa.String(20),
         existing_nullable=False,
     )
     op.alter_column(
-        "integrations", "provider_account_id",
+        "integrations",
+        "provider_account_id",
         existing_type=sa.String(128),
         type_=sa.String(200),
         existing_nullable=False,
     )
     op.alter_column(
-        "integrations", "provider",
+        "integrations",
+        "provider",
         existing_type=sa.String(32),
         type_=sa.String(50),
         existing_nullable=False,

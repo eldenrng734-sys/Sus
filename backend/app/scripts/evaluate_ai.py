@@ -205,9 +205,7 @@ def _group_metrics(
         successful_predictions=successful,
         failed_predictions=total - successful,
         fields=fields,
-        overall_field_accuracy_percent=(
-            100 * overall_correct / all_fields if all_fields else None
-        ),
+        overall_field_accuracy_percent=(100 * overall_correct / all_fields if all_fields else None),
     )
 
 

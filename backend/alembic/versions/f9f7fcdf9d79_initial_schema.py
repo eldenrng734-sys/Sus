@@ -541,7 +541,6 @@ def upgrade() -> None:
         ),
         sa.Column("id", sa.UUID(), server_default=sa.text("gen_random_uuid()"), nullable=False),
         sa.CheckConstraint(
-
             "buying_stage IS NULL OR buying_stage IN "
             "('awareness','consideration','decision','unknown')",
             name=op.f("ck_lead_assessments_buying_stage"),
@@ -553,7 +552,8 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint(
             "intent IS NULL OR intent IN "
-            "('request_demo','pricing','support','info','complaint','other','unknown')",            name=op.f("ck_lead_assessments_intent"),
+            "('request_demo','pricing','support','info','complaint','other','unknown')",
+            name=op.f("ck_lead_assessments_intent"),
         ),
         sa.CheckConstraint(
             "needs_human_review = false OR review_status <> 'not_required'",
@@ -564,18 +564,18 @@ def upgrade() -> None:
             name=op.f("ck_lead_assessments_priority"),
         ),
         sa.CheckConstraint(
-
             "recommended_action IS NULL OR recommended_action IN "
-            "('call','schedule_demo','email','follow_up','support','none')",            name=op.f("ck_lead_assessments_recommended_action"),
+            "('call','schedule_demo','email','follow_up','support','none')",
+            name=op.f("ck_lead_assessments_recommended_action"),
         ),
         sa.CheckConstraint(
             "review_status IN ('not_required','pending','approved','rejected')",
             name=op.f("ck_lead_assessments_review_status"),
         ),
         sa.CheckConstraint(
-
             "review_status NOT IN ('approved','rejected') OR "
-            "(reviewed_by_user_id IS NOT NULL AND reviewed_at IS NOT NULL)",            name=op.f("ck_lead_assessments_reviewed_has_reviewer"),
+            "(reviewed_by_user_id IS NOT NULL AND reviewed_at IS NOT NULL)",
+            name=op.f("ck_lead_assessments_reviewed_has_reviewer"),
         ),
         sa.CheckConstraint(
             "sentiment IS NULL OR sentiment IN ('positive','neutral','negative')",

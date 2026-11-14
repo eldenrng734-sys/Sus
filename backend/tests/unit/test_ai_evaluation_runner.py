@@ -131,9 +131,7 @@ def test_metrics_are_separated_by_english_and_bangla():
     records = records_with_prediction(language="en") + records_with_prediction(
         language="bn", count=2
     )
-    predictions = iter(
-        [good_prediction(), good_prediction(intent="info"), good_prediction()]
-    )
+    predictions = iter([good_prediction(), good_prediction(intent="info"), good_prediction()])
     report = run(records, lambda *_args, **_kwargs: next(predictions))
 
     assert report.by_language["en"].total_records == 1
@@ -253,9 +251,7 @@ def test_llm_adapter_uses_existing_client_and_runner_prompt(monkeypatch):
 def test_invalid_llm_json_is_recorded_as_failed_prediction(monkeypatch):
     monkeypatch.setattr(settings, "llm_api_key", "test-key")
     monkeypatch.setattr(settings, "llm_model", "test-model")
-    client = SimpleNamespace(
-        complete=lambda **_kwargs: SimpleNamespace(text="not valid JSON")
-    )
+    client = SimpleNamespace(complete=lambda **_kwargs: SimpleNamespace(text="not valid JSON"))
     monkeypatch.setattr(evaluate_ai, "get_llm_client", lambda: client)
 
     report = evaluate_ai.evaluate_records(records_with_prediction())

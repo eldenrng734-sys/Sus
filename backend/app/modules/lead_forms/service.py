@@ -64,9 +64,7 @@ def submit_public_form(
                 name=submission.name if "name" in allowed else "",
                 email=submission.email if "email" in allowed else None,
                 phone=submission.phone if "phone" in allowed else None,
-                company_name=(
-                    submission.company_name if "company_name" in allowed else None
-                ),
+                company_name=(submission.company_name if "company_name" in allowed else None),
                 source="website_form",
                 source_campaign=campaign[:200] if campaign else None,
                 consent=True,

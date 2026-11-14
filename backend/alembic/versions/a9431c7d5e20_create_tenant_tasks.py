@@ -31,7 +31,9 @@ def upgrade() -> None:
         sa.Column("due_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("assigned_user_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("team_id", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column("requires_approval", sa.Boolean(), server_default=sa.text("false"), nullable=False),
+        sa.Column(
+            "requires_approval", sa.Boolean(), server_default=sa.text("false"), nullable=False
+        ),
         sa.Column(
             "approval_status",
             sa.Text(),
