@@ -1,12 +1,22 @@
 import re
 import uuid
 from collections.abc import Iterable, Sequence
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.modules.ai.models import LeadAssessment
+from app.modules.ai.rules import (
+    apply_assessment_business_rules,
+    calculate_lead_score,
+    determine_priority,
+    has_lead_scoring_signals,
+    lock_lead_for_assessment,
+    requires_human_review,
+)
 
 PROMPT_VERSION = "lead-assessment-v2"
 REVIEW_CONFIDENCE_THRESHOLD = 0.6
@@ -39,6 +49,16 @@ class ConversationAnalysisOutput(AssessmentOutput):
     sentiment: Literal["positive", "neutral", "negative"]
     summary: str = Field(min_length=1, max_length=4000)
     confidence: FiniteFloat = Field(ge=0, le=1)
+
+
+def _score_fields(output: AssessmentOutput, status: str) -> tuple[int | None, str | None]:
+    if status != "ok":
+        return None, None
+    if not has_lead_scoring_signals(output):
+        return None, None
+    score = calculate_lead_score(output)
+    review_required = requires_human_review(output, status)
+    return score, determine_priority(output, score, review_required)
 
 
 def redact_pii(text: str, pii_values: Iterable[str] = ()) -> str:
@@ -102,20 +122,19 @@ def persist_assessment(
     values = tuple(pii_values)
     result = validated.model_dump()
     if status == "ok" and not any(
-        value is not None for key, value in result.items() if key != "confidence"
+        value is not None
+        for key, value in result.items()
+        if key not in {"confidence", "lead_score", "priority"}
     ):
         raise ValueError("successful assessment output must contain an assessment value")
-    if status == "ok" and (not result["summary"] or not result["sentiment"]):
-        raise ValueError("successful conversation assessment requires summary and sentiment")
+    result["lead_score"], result["priority"] = _score_fields(validated, status)
     for field in ("interest", "summary"):
         if result[field] is not None:
             result[field] = redact_pii(result[field], values)
+    if status == "ok" and (not result["summary"] or not result["sentiment"]):
+        raise ValueError("successful conversation assessment requires summary and sentiment")
 
-    needs_review = (
-        status != "ok"
-        or result["confidence"] is None
-        or result["confidence"] < REVIEW_CONFIDENCE_THRESHOLD
-    )
+    needs_review = requires_human_review(validated, status)
     assessment = LeadAssessment(
         tenant_id=tenant_id,
         lead_id=lead_id,
@@ -128,6 +147,12 @@ def persist_assessment(
         raw_output=result,
         status=status,
     )
+    lead = lock_lead_for_assessment(session, tenant_id, lead_id)
+    created_at = session.scalar(select(func.clock_timestamp()))
+    if not isinstance(created_at, datetime):
+        raise RuntimeError("Database did not return an assessment timestamp")
+    assessment.created_at = created_at
     session.add(assessment)
     session.flush()
+    apply_assessment_business_rules(session, assessment, lead)
     return assessment

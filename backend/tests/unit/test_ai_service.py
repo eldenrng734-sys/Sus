@@ -1,10 +1,13 @@
 import uuid
+from datetime import UTC, datetime
 from math import nan
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 from pydantic import ValidationError
 
+from app.modules.ai import service as assessment_service
 from app.modules.ai.models import LeadAssessment
 from app.modules.ai.service import (
     PROMPT_VERSION,
@@ -13,6 +16,16 @@ from app.modules.ai.service import (
     persist_assessment,
     redact_pii,
 )
+
+
+@pytest.fixture(autouse=True)
+def isolate_persistence_tests(monkeypatch):
+    monkeypatch.setattr(
+        assessment_service,
+        "lock_lead_for_assessment",
+        MagicMock(return_value=SimpleNamespace()),
+    )
+    monkeypatch.setattr(assessment_service, "apply_assessment_business_rules", MagicMock())
 
 
 def test_redact_pii_masks_known_values_emails_and_phone_numbers():
@@ -45,6 +58,7 @@ def test_build_assessment_prompt_redacts_message_and_records_prompt_version():
 
 def test_persist_assessment_stores_versions_and_only_redacted_output():
     session = MagicMock()
+    session.scalar.return_value = datetime.now(UTC)
     tenant_id = uuid.uuid4()
     lead_id = uuid.uuid4()
     conversation_id = uuid.uuid4()
@@ -78,6 +92,7 @@ def test_persist_assessment_stores_versions_and_only_redacted_output():
 
 def test_persist_assessment_marks_provider_failure_for_review():
     session = MagicMock()
+    session.scalar.return_value = datetime.now(UTC)
 
     assessment = persist_assessment(
         session,
