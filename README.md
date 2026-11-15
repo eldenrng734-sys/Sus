@@ -324,6 +324,12 @@ Example message: *"I need a CRM for my 20-person sales team. Please arrange a de
 
 **Flow:** get permitted history → redact unnecessary PII → structured prompt → validate with Pydantic → save with model + prompt version → deterministic rules decide tasks and approval.
 
+- The backend AI service redacts supplied lead identifiers plus email/phone patterns, builds a versioned prompt input, validates structured assessment output, and persists only redacted validated output with the model and prompt version.
+- Conversation analysis uses the OpenAI API to summarize recent messages and classify customer sentiment. Configure `OPENAI_API_KEY` and optionally `OPENAI_MODEL` in the deployment environment; message content is redacted before it is sent.
+- `POST /api/v1/conversations/{conversation_id}/analyze` generates and stores a conversation analysis; `GET /api/v1/conversations/{conversation_id}/analysis` returns its latest summary and sentiment.
+- Lead score is backend-computed (intent 0–35, buying stage 0–20, category 0–15, sentiment 0–15, confidence 0–15); model-supplied score/priority are ignored. Priority is high at 70+, medium at 40+, otherwise low; risk signals cap it at low and pending-review cases cap at medium.
+- Spam/unknown category, complaint/unknown intent, negative sentiment, confidence below 0.6, and fallback/failed results require human review. Actionable tasks are created idempotently only for the latest successful assessment after review is not required or explicitly approved, and only for open, opted-in leads. `follow_up_days` wins; otherwise action-specific defaults apply.
+- Conversation-only summary/sentiment results without category, intent, or buying-stage signals retain a null lead score/priority and do not overwrite existing lead values.
 - The LLM never modifies data, assigns permissions or sends messages directly.
 - Low confidence (e.g. < 0.6) → mark for human review.
 - Bangla and English are both supported and both included in the evaluation set.

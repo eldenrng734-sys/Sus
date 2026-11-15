@@ -22,7 +22,7 @@ from app.modules.users.models import User
 
 
 def signup(session: Session, body: SignupRequest) -> dict:
-    """Create the company and its first admin in ONE transaction. No tokens are issued."""
+    """Create the company and its first admin in one transaction. No tokens are issued."""
 
     if session.scalar(select(User.id).where(User.email == body.email)):
         raise AuthError(
@@ -118,11 +118,11 @@ def login(
     ip: str | None = None,
     user_agent: str | None = None,
 ) -> tuple[dict, str | None]:
-    """Apply login limits, verify credentials and start a refresh-token session."""
+    """Apply login limits, verify credentials and start a session."""
 
     email = body.email.strip().lower()
 
-    # Provisional limits; confirm these thresholds with the team before production.
+    # Provisional limits; confirm these thresholds before production.
     window_minutes = 15
     max_email_failures = 5
     max_ip_failures = 20
@@ -147,6 +147,7 @@ def login(
 
     if user is None:
         verify_password(body.password, DUMMY_PASSWORD_HASH)
+
         record_login_attempt(
             session,
             email=email,
@@ -154,6 +155,7 @@ def login(
             success=False,
         )
         session.commit()
+
         raise AuthError(
             401,
             "invalid_credentials",
@@ -168,6 +170,7 @@ def login(
             success=False,
         )
         session.commit()
+
         raise AuthError(
             401,
             "invalid_credentials",
@@ -182,6 +185,7 @@ def login(
             success=False,
         )
         session.commit()
+
         raise AuthError(
             403,
             "account_disabled",
@@ -196,19 +200,30 @@ def login(
             success=False,
         )
         session.commit()
+
         raise AuthError(
             403,
             "email_not_verified",
             "Verify your email before logging in",
         )
 
+    # MFA is mandatory for admins, including initial enrollment.
     if user.mfa_enabled or mfa.is_admin_user(session, user):
         purpose = "login" if user.mfa_enabled else "enrollment"
+
         if purpose == "enrollment":
             mfa.validate_encryption_key()
+
         challenge = mfa.issue_challenge(session, user.id, purpose)
-        record_login_attempt(session, email=email, ip_address=ip, success=True)
+
+        record_login_attempt(
+            session,
+            email=email,
+            ip_address=ip,
+            success=True,
+        )
         session.commit()
+
         return {
             "mfa_required": purpose == "login",
             "mfa_setup_required": purpose == "enrollment",

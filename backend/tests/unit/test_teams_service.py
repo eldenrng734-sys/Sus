@@ -1,6 +1,6 @@
-﻿from types import SimpleNamespace
-from unittest.mock import MagicMock
 import uuid
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic import ValidationError
@@ -41,12 +41,14 @@ def test_list_teams_returns_team_data():
 
     result = service.list_teams(session, context)
 
-    assert result == [{
-        "id": str(team.id),
-        "name": "Dhaka Sales",
-        "created_at": None,
-        "updated_at": None,
-    }]
+    assert result == [
+        {
+            "id": str(team.id),
+            "name": "Dhaka Sales",
+            "created_at": None,
+            "updated_at": None,
+        }
+    ]
 
 
 def test_create_team_rejects_duplicate_name():

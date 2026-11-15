@@ -554,6 +554,8 @@ Route ordering: declare static paths before parameterized paths (`GET /tasks/due
 | GET | `/api/v1/conversations` | Tenant | Any (scoped) | List conversations |
 | GET | `/api/v1/conversations/{id}` | Tenant | Any (scoped) | Conversation detail |
 | GET | `/api/v1/conversations/{id}/messages` | Tenant | Any (scoped) | Message history |
+| POST | `/api/v1/conversations/{id}/analyze` | Tenant | Any (scoped) | Generate and store summary and sentiment |
+| GET | `/api/v1/conversations/{id}/analysis` | Tenant | Any (scoped) | Get latest summary and sentiment |
 | POST | `/api/v1/conversations/{id}/read` | Tenant | Any (scoped) | Mark conversation read |
 | POST | `/api/v1/messages` | Tenant | Any (scoped) | Send outbound message |
 | POST | `/api/v1/tasks` | Tenant | Any (scoped) | Create task |
@@ -1063,7 +1065,7 @@ Round-robin assignment is a server-side rule. It must be transactional and idemp
 { "reason": "Customer asked to stop messages" }
 ```
 
-`200 OK`; sets `opted_out = true`, pauses all automated follow-ups, and adds an audit/timeline event. Outbound message attempts return `403 opt_out`.
+`200 OK`; sets `opted_out = true`, records the opt-out timestamp and source, cancels open automated follow-up tasks, and adds an audit/timeline event. Outbound message attempts return `403 opt_out`; attempts without consent return `403 no_consent`.
 
 ### 8.7 Timeline
 
@@ -1133,6 +1135,10 @@ Role scoping:
 
 `GET /api/v1/conversations/{id}/messages?cursor=&limit=50` returns messages newest first. `meta.next_cursor` loads older messages.
 
+`POST /api/v1/conversations/{id}/analyze` sends up to the latest 100 messages (bounded to 20,000 characters) to the configured OpenAI model after redacting known lead name/contact information, email addresses, and phone numbers. It validates and stores the summary, sentiment, model, prompt version, confidence, and review status in `lead_assessments`. Configure `OPENAI_API_KEY` and optionally `OPENAI_MODEL`; a missing key returns `503`, and provider/invalid-output errors return `502`.
+
+`GET /api/v1/conversations/{id}/analysis` returns the latest stored summary and sentiment for that conversation. Both routes use the caller's normal lead visibility scope.
+
 `POST /api/v1/conversations/{id}/read` marks unread messages as read and returns `204`. It is scoped to the caller.
 
 ### 9.2 `POST /api/v1/messages`
@@ -1164,6 +1170,7 @@ Rules:
 
 - Caller must have access to the conversation's lead.
 - `opted_out = true` → `403 opt_out`.
+- `consent = false` → `403 no_consent`.
 - Conversation closed → `409 conversation_closed` unless the caller reopens it (not in MVP).
 - The message is persisted and queued; the provider send happens in a background worker.
 - Provider message IDs and delivery status are updated by webhooks.

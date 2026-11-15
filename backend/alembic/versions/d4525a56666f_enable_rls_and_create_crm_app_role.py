@@ -5,6 +5,7 @@ Revises: c3a8d5e17f42
 Create Date: 2026-11-10 03:58:34.705182
 
 """
+
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -12,8 +13,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'd4525a56666f'
-down_revision: Union[str, Sequence[str], None] = 'c3a8d5e17f42'
+revision: str = "d4525a56666f"
+down_revision: Union[str, Sequence[str], None] = "c3a8d5e17f42"
 depends_on: Union[str, Sequence[str], None] = None
 
 
@@ -22,8 +23,17 @@ USER_GUC = "NULLIF(current_setting('app.user_id', true), '')::uuid"
 
 # Tables that only need the standard tenant-isolation policy.
 STANDARD = [
-    "teams", "invitations", "leads", "contacts", "interactions", "conversations",
-    "messages", "lead_assessments", "tasks", "integrations", "webhook_events",
+    "teams",
+    "invitations",
+    "leads",
+    "contacts",
+    "interactions",
+    "conversations",
+    "messages",
+    "lead_assessments",
+    "tasks",
+    "integrations",
+    "webhook_events",
 ]
 
 # Tables that have a tenant_id column but are deliberately NOT tenant-isolated
@@ -118,7 +128,9 @@ def upgrade() -> None:
         )
 
     # 4. Safety net: fail the migration if any tenant table was missed.
-    missing = conn.execute(sa.text("""
+    missing = (
+        conn.execute(
+            sa.text("""
         SELECT DISTINCT c.relname
         FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -126,7 +138,11 @@ def upgrade() -> None:
           ON col.table_schema = n.nspname AND col.table_name = c.relname
         WHERE n.nspname = 'public' AND c.relkind = 'r' AND col.column_name = 'tenant_id'
           AND NOT (c.relrowsecurity AND c.relforcerowsecurity)
-    """)).scalars().all()
+    """)
+        )
+        .scalars()
+        .all()
+    )
     missing = sorted(set(missing) - EXEMPT)
     if missing:
         raise RuntimeError(f"Tenant tables without RLS: {missing}")
@@ -135,9 +151,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     conn = op.get_bind()
     existing = _existing(conn)
-    migration_policies = {
-        t: {f"{t}_tenant_isolation"} for t in STANDARD
-    }
+    migration_policies = {t: {f"{t}_tenant_isolation"} for t in STANDARD}
     migration_policies.update(
         {
             "tenant_memberships": {
