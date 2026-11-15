@@ -12,6 +12,7 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.outbox import emit_lead_created as _enqueue_lead_created
 from app.modules.leads.capture_normalize import (
     InvalidContact,
     clean_name,
@@ -124,12 +125,9 @@ def capture_lead(
 
 
 def emit_lead_created(db: Session, lead: Lead, actor_user_id: uuid.UUID | None) -> None:
-    """Hook: write a lead.created row to outbox_events inside this transaction.
-
-    Not wired yet: the outbox model must exist first. Keep this call in the same
-    transaction so the event exists only if the lead commits.
-    """
-    return None
+    _enqueue_lead_created(
+        db, tenant_id=lead.tenant_id, lead_id=lead.id, source=lead.source
+    )
 
 
 # --- internals -------------------------------------------------------------
