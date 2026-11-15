@@ -121,6 +121,56 @@ def test_admin_access_requires_totp_assurance(monkeypatch):
     mfa.require_mfa_access(MagicMock(), user, ["pwd", "totp"])
 
 
+def test_invalid_mfa_login_code_is_rejected_and_recorded(monkeypatch):
+    user = _user(mfa_enabled=True)
+    user.mfa_secret_encrypted = mfa.encrypt_secret(pyotp.random_base32())
+    challenge = SimpleNamespace(used_at=None)
+    session = MagicMock()
+    record_failure = MagicMock()
+    monkeypatch.setattr(mfa, "_load_challenge", lambda *args: (challenge, user))
+    monkeypatch.setattr(mfa, "_check_mfa_rate_limit", lambda *args: None)
+    monkeypatch.setattr(mfa, "_match_totp_step", lambda *args: None)
+    monkeypatch.setattr(mfa, "_recovery_code_row", lambda *args: None)
+    monkeypatch.setattr(mfa, "_record_mfa_failure", record_failure)
+
+    with pytest.raises(AuthError) as error:
+        mfa.verify_login(session, "challenge", "000000", None, None)
+
+    assert error.value.code == "invalid_mfa_code"
+    record_failure.assert_called_once_with(session, user, None)
+
+
+def test_recovery_code_is_consumed_on_successful_mfa_login(monkeypatch):
+    user = _user(mfa_enabled=True)
+    user.mfa_secret_encrypted = mfa.encrypt_secret(pyotp.random_base32())
+    challenge = SimpleNamespace(used_at=None)
+    recovery_row = SimpleNamespace(used_at=None)
+    session = MagicMock()
+    monkeypatch.setattr(mfa, "_load_challenge", lambda *args: (challenge, user))
+    monkeypatch.setattr(mfa, "_check_mfa_rate_limit", lambda *args: None)
+    monkeypatch.setattr(mfa, "_match_totp_step", lambda *args: None)
+    monkeypatch.setattr(mfa, "_recovery_code_row", lambda *args: recovery_row)
+    monkeypatch.setattr(
+        mfa.sessions,
+        "start_session",
+        lambda *args, **kwargs: {
+            "access_token": "access",
+            "csrf_token": "csrf",
+            "refresh_token": "refresh",
+        },
+    )
+    monkeypatch.setattr(mfa, "record_login_attempt", lambda *args, **kwargs: None)
+    monkeypatch.setattr(mfa, "_audit_mfa", lambda *args: None)
+
+    data, refresh_token = mfa.verify_login(session, "challenge", "recovery-code", None, None)
+
+    assert challenge.used_at is not None
+    assert recovery_row.used_at is not None
+    assert data["access_token"] == "access"
+    assert refresh_token == "refresh"
+    session.commit.assert_called_once()
+
+
 @pytest.mark.parametrize(
     ("mfa_verified", "expected_amr"),
     [(False, ["pwd"]), (True, ["pwd", "totp"])],
