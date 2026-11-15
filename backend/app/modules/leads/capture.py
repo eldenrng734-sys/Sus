@@ -123,9 +123,7 @@ def capture_lead(
 
 
 def emit_lead_created(db: Session, lead: Lead, actor_user_id: uuid.UUID | None) -> None:
-    _enqueue_lead_created(
-        db, tenant_id=lead.tenant_id, lead_id=lead.id, source=lead.source
-    )
+    _enqueue_lead_created(db, tenant_id=lead.tenant_id, lead_id=lead.id, source=lead.source)
 
 
 # --- internals -------------------------------------------------------------

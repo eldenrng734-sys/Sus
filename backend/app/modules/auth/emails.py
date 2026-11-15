@@ -39,6 +39,8 @@ def send_verification_email(to: str, raw_token: str) -> None:
             "If you didn't create an account, you can ignore this email."
         ),
     )
+
+
 def send_invitation_email(to: str, raw_token: str) -> None:
     link = f"{settings.frontend_base_url}/accept-invite?token={quote(raw_token)}"
     _send(to, "You are invited", f"Accept your invitation:\n{link}")

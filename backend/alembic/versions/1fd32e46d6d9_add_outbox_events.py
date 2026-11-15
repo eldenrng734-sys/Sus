@@ -5,15 +5,15 @@ Revises: f6a8c0d2e491
 Create Date: 2026-11-15 09:59:23.286246
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '1fd32e46d6d9'
-down_revision: Union[str, Sequence[str], None] = 'f6a8c0d2e491'
+revision: str = "1fd32e46d6d9"
+down_revision: Union[str, Sequence[str], None] = "f6a8c0d2e491"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -53,8 +53,12 @@ def upgrade() -> None:
             WHERE idempotency_key IS NOT NULL
         """
     )
-    op.execute("CREATE INDEX ix_outbox_events_status_available ON outbox_events (status, available_at)")
-    op.execute("CREATE INDEX ix_outbox_events_tenant_created ON outbox_events (tenant_id, created_at DESC)")
+    op.execute(
+        "CREATE INDEX ix_outbox_events_status_available ON outbox_events (status, available_at)"
+    )
+    op.execute(
+        "CREATE INDEX ix_outbox_events_tenant_created ON outbox_events (tenant_id, created_at DESC)"
+    )
 
     op.execute("ALTER TABLE outbox_events ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE outbox_events FORCE ROW LEVEL SECURITY")
