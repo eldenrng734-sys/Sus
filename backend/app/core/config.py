@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     whatsapp_app_secret: str = ""
     meta_app_secret: str = ""
     webhook_verify_token: str = ""
+    n8n_service_secret: SecretStr | None = None
     cookie_secure: bool = False  # set COOKIE_SECURE=true in staging/production
     allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
     llm_api_key: str = ""
