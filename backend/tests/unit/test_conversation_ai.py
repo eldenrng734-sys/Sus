@@ -7,6 +7,7 @@ import pytest
 from pydantic import SecretStr
 
 from app.core.config import settings
+from app.modules.ai.provider import AIProviderError
 from app.modules.ai.service import ConversationAnalysisOutput
 from app.modules.auth.errors import AuthError
 from app.modules.conversations import service
@@ -82,6 +83,45 @@ def test_analyze_conversation_redacts_pii_persists_and_returns_analysis(monkeypa
     assert persisted["lead_id"] == lead_id
     assert persisted["conversation_id"] == conversation_id
     assert persisted["output"].sentiment == "positive"
+    assert session.commit.call_count == 2
+
+
+def test_analyze_conversation_persists_failed_assessment_for_review(monkeypatch):
+    tenant_id = uuid.uuid4()
+    conversation_id = uuid.uuid4()
+    lead_id = uuid.uuid4()
+    context = SimpleNamespace(tenant_id=tenant_id)
+    conversation = SimpleNamespace(id=conversation_id, lead_id=lead_id)
+    lead = SimpleNamespace(id=lead_id, name="Ayesha", email=None, phone=None)
+    message = SimpleNamespace(direction="inbound", message_text="Need a demo")
+    session = MagicMock()
+    session.scalars.return_value.__iter__.return_value = [message]
+    monkeypatch.setattr(service, "_get_conversation", lambda *args: conversation)
+    monkeypatch.setattr(service, "_get_lead", lambda *args: lead)
+    monkeypatch.setattr(settings, "openai_api_key", SecretStr("test-api-key"))
+    monkeypatch.setattr(settings, "openai_model", "gpt-test")
+    monkeypatch.setattr(
+        service,
+        "analyze_with_openai",
+        MagicMock(side_effect=AIProviderError("invalid response")),
+    )
+    persisted = {}
+    monkeypatch.setattr(
+        service,
+        "persist_assessment",
+        lambda _session, **kwargs: persisted.update(kwargs),
+    )
+
+    with pytest.raises(AuthError) as exc:
+        service.analyze_conversation(session, context, conversation_id)
+
+    assert exc.value.status_code == 502
+    assert persisted["tenant_id"] == tenant_id
+    assert persisted["lead_id"] == lead_id
+    assert persisted["conversation_id"] == conversation_id
+    assert persisted["output"] == {}
+    assert persisted["status"] == "failed"
+    assert persisted["prompt_version"] == "lead-assessment-v3"
     assert session.commit.call_count == 2
 
 
