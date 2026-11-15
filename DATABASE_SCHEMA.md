@@ -390,7 +390,15 @@ CHECK (intent IS NULL OR intent IN ('request_demo','pricing','support','info','c
 CHECK (consent_source IS NULL OR consent_source IN ('web_form','whatsapp','manual','import','api')),
 CHECK (NOT opted_out OR opted_out_at IS NOT NULL),
 CHECK (lead_score IS NULL OR lead_score BETWEEN 0 AND 100),
-CHECK (email IS NOT NULL OR phone IS NOT NULL),
+CHECK (
+  email IS NOT NULL
+  OR phone IS NOT NULL
+  OR (
+    source IN ('facebook_lead_ads','messenger')
+    AND external_id IS NOT NULL
+    AND external_id <> ''
+  )
+),
 CHECK (email IS NULL OR email = lower(email))
 ```
 
@@ -406,6 +414,8 @@ CREATE INDEX leads_tenant_phone_idx ON leads (tenant_id, phone);
 ```
 
 > Email and phone are matched by **lookup**, not a hard unique constraint, because one person can legitimately appear twice and phone formats vary. The capture service decides when to merge.
+
+> **Provider-native leads.** Meta Messenger PSIDs and Lead Ad submissions can arrive without an email or phone. For `source` in (`facebook_lead_ads`, `messenger`) the capture service therefore accepts a lead when `external_id` is present. Every other source still requires at least one contact field. A Lead Ad submission is **not** marketing consent: `consent` stays `false` until an explicit consent flow records it.
 
 ### `contacts` ✅ (columns 🔶)
 
@@ -639,6 +649,7 @@ WHERE m.tenant_id = :tenant_id
 | `delivered_at` | timestamptz | |
 | `read_at` | timestamptz | |
 | `error_code` | text | Redacted provider error |
+| `idempotency_key` | text | Optional caller-supplied outbound dedup key |
 | `created_at` / `updated_at` | timestamptz | |
 
 Constraints:
@@ -649,6 +660,14 @@ UNIQUE (tenant_id, provider, provider_message_id),
 CHECK (provider IN ('whatsapp','messenger')),
 CHECK (direction IN ('inbound','outbound')),
 CHECK (status IN ('received','queued','sent','delivered','read','failed'))
+```
+
+Outbound replay protection:
+
+```sql
+CREATE UNIQUE INDEX uq_messages_tenant_idempotency
+  ON messages (tenant_id, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
 ```
 
 > The guide's `messages` column list has no `provider`; this schema adds it so the required unique index `(tenant_id, provider, provider_message_id)` is valid. That open question is now resolved. Inbound messages start as `received`; outbound messages start as `queued` and move to `sent`/`delivered`/`read`/`failed` from provider callbacks.
@@ -1285,6 +1304,7 @@ Proposed 🔶:
 | `conversation_reads (tenant_id, user_id, last_read_at)` | Unread counts |
 | `messages (tenant_id, conversation_id, created_at)` | Message thread |
 | `messages (tenant_id, provider, provider_message_id)` UNIQUE | Dedup |
+| `messages (tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL` UNIQUE | Outbound replay protection |
 | `message_attachments (tenant_id, message_id)` | Message attachments |
 | `interactions (tenant_id, lead_id, occurred_at)` | Timeline |
 | `lead_assessments (tenant_id, lead_id, created_at DESC)` | Latest assessment |

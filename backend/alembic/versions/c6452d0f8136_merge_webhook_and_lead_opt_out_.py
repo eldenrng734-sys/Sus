@@ -3,8 +3,8 @@
 Revision ID: c6452d0f8136
 Revises: a7d3c91e5b20, d7b1f4a6c802
 """
-
 from typing import Sequence, Union
+
 
 # revision identifiers, used by Alembic.
 revision: str = "c6452d0f8136"

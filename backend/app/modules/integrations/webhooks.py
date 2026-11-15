@@ -1,26 +1,47 @@
-"""Webhook framework.
+"""Webhook dispatcher framework.
 
 Verify the raw request signature before parsing JSON.
 Resolve the tenant exclusively through the registered integration.
+Write idempotency records via record_event() — never raw INSERT.
+
+Call order enforced here:
+  1. Signature check (401 on failure — before any DB write)
+  2. JSON parse (400 on failure)
+  3. extract_events() — produce ParsedEvent list
+  4. Per event: resolve_integration → record_event → provider.handle()
+
+The dispatcher owns the transaction; providers must not commit or rollback.
+Unknown account IDs are silently skipped (HTTP 200) so Meta does not retry.
 """
 
 import hashlib
 import hmac
 import json
-import uuid
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
-from sqlalchemy import func, or_, select, text
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from fastapi import BackgroundTasks
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.events import EventName, event_emitter
 from app.modules.auth.errors import AuthError
-from app.modules.integrations.models import Integration, WebhookEvent
+from app.modules.integrations import meta as _meta_init  # noqa: F401
+from app.modules.integrations import whatsapp as _wa_init  # noqa: F401
+from app.modules.integrations.models import (
+    mark_webhook_event_processed,
+    mark_webhook_event_processing,
+    record_event,
+)
+from app.modules.integrations.protocols import AfterCommitJob
+from app.modules.integrations.registry import get_provider
 from app.modules.integrations.signature import verify_signature
+
+logger = logging.getLogger(__name__)
 
 PROVIDERS = {"whatsapp", "meta"}
 MAX_BODY_BYTES = 1_000_000
@@ -35,11 +56,8 @@ class ParsedEvent:
 
 
 def _secret_for(provider: str) -> str:
-    if provider == "whatsapp":
-        return settings.whatsapp_app_secret
-    if provider == "meta":
-        return settings.meta_app_secret
-    return ""
+    # Both WhatsApp and Meta (Lead Ads / Messenger) share the same app secret.
+    return settings.meta_app_secret.get_secret_value()
 
 
 def _dicts(value: Any) -> list[dict]:
@@ -95,7 +113,7 @@ def extract_events(provider: str, payload: Any) -> list[ParsedEvent]:
 
                     events.append(ParsedEvent(account, event_id, "status", status))
 
-        else:
+        else:  # meta — Messenger and Lead Ads
             account = str(entry.get("id") or "")
             if not account:
                 continue
@@ -106,7 +124,6 @@ def extract_events(provider: str, payload: Any) -> list[ParsedEvent]:
                     message = {}
 
                 event_id = str(message.get("mid") or _fallback_id(item))
-
                 events.append(ParsedEvent(account, event_id, "message", item))
 
             for change in _dicts(entry.get("changes")):
@@ -142,42 +159,36 @@ def _resolve_integration(
     session: Session,
     provider: str,
     account_id: str,
-) -> tuple[uuid.UUID, uuid.UUID]:
-    """Resolve one active integration and its tenant before tenant context exists."""
+) -> tuple[UUID, UUID] | None:
+    """Return (tenant_id, integration_id) for one active integration, or None.
 
-    _set_local(session, "app.webhook_provider", provider)
-    _set_local(session, "app.webhook_account_id", account_id)
+    Returns None — not an error — when the account is unknown. Callers must
+    return HTTP 200 and skip processing so Meta does not keep retrying.
 
-    rows = session.execute(
-        select(Integration.id, Integration.tenant_id)
-        .where(
-            Integration.provider == provider,
-            Integration.provider_account_id == account_id,
-            Integration.status == "active",
-            or_(
-                Integration.expires_at.is_(None),
-                Integration.expires_at > func.now(),
-            ),
+    Calls the narrow SECURITY DEFINER SQL function resolve_integration(provider, account_id).
+    """
+    row = session.execute(
+        text("SELECT tenant_id, integration_id FROM resolve_integration(:p, :a)"),
+        {"p": provider, "a": account_id},
+    ).first()
+
+    if row is None:
+        logger.warning(
+            "webhook.unknown_account provider=%s account_id=%s",
+            provider,
+            account_id,
         )
-        .limit(2)
-    ).all()
+        return None
 
-    # Fail closed if no account exists or the account is ambiguous.
-    if len(rows) != 1:
-        raise AuthError(
-            403,
-            "unknown_provider_account",
-            "Unknown provider account",
-        )
-
-    return rows[0].id, rows[0].tenant_id
+    return row.tenant_id, row.integration_id
 
 
-def receive(
+async def receive(
     session: Session,
     provider: str,
     raw_body: bytes,
     signature_header: str | None,
+    background: BackgroundTasks | None = None,
 ) -> dict:
     if provider not in PROVIDERS:
         raise AuthError(404, "not_found", "Unknown provider")
@@ -189,18 +200,27 @@ def receive(
             "Webhook body is too large",
         )
 
-    # IMPORTANT: argument order matches signature.py.
-    # Signature verification happens before JSON parsing.
-    if not verify_signature(
-        raw_body,
-        signature_header,
-        _secret_for(provider),
-    ):
-        raise AuthError(
-            401,
-            "invalid_signature",
-            "Invalid signature",
-        )
+    provider_impl = get_provider(provider)
+
+    # Signature verification happens before JSON parsing — always.
+    if provider_impl is not None:
+        if not provider_impl.verify_signature(raw_body, signature_header):
+            raise AuthError(
+                401,
+                "invalid_signature",
+                "Invalid signature",
+            )
+    else:
+        if not verify_signature(
+            raw_body,
+            signature_header,
+            _secret_for(provider),
+        ):
+            raise AuthError(
+                401,
+                "invalid_signature",
+                "Invalid signature",
+            )
 
     try:
         payload = json.loads(raw_body)
@@ -211,80 +231,96 @@ def receive(
             "Body is not valid JSON",
         ) from exc
 
-    events = extract_events(provider, payload)
+    if provider_impl is not None:
+        events = provider_impl.parse(payload)
+    else:
+        events = extract_events(provider, payload)
 
     stored = 0
     duplicates = 0
-    integrations: dict[str, tuple[uuid.UUID, uuid.UUID]] = {}
-    pending_message_events: list[dict[str, object]] = []
+    skipped = 0
+    deferred: list[AfterCommitJob] = []
+    # Cache per-request to avoid one DB round-trip per event from the same account.
+    resolved: dict[str, tuple[UUID, UUID] | None] = {}
 
     try:
         for event in events:
-            if event.account_id not in integrations:
-                integrations[event.account_id] = _resolve_integration(
+            if event.account_id not in resolved:
+                resolved[event.account_id] = _resolve_integration(
                     session,
                     provider,
                     event.account_id,
                 )
 
-            integration_id, tenant_id = integrations[event.account_id]
+            result = resolved[event.account_id]
+            if result is None:
+                # Unknown account — acknowledge but do not process.
+                skipped += 1
+                continue
 
-            # Tenant comes only from the verified integration record.
+            tenant_id, integration_id = result
+
+            # Set tenant context for RLS on any subsequent ORM queries in
+            # this transaction (e.g. inside provider.handle()).
             _set_local(session, "app.tenant_id", str(tenant_id))
 
-            inserted = session.scalar(
-                pg_insert(WebhookEvent)
-                .values(
-                    tenant_id=tenant_id,
-                    integration_id=integration_id,
-                    provider=provider,
-                    event_id=event.event_id,
-                    event_type=event.event_type,
-                    payload=event.data,
-                    status="received",
-                )
-                .on_conflict_do_nothing(
-                    index_elements=[
-                        "tenant_id",
-                        "provider",
-                        "event_id",
-                    ]
-                )
-                .returning(WebhookEvent.id)
+            # record_event handles idempotency via ON CONFLICT DO NOTHING.
+            # None return means the event already exists — skip handle().
+            new_id = record_event(
+                session,
+                tenant_id=tenant_id,
+                integration_id=integration_id,
+                provider=provider,
+                event_id=event.event_id,
+                event_type=event.event_type,
+                payload=event.data,
             )
 
-            if inserted is None:
+            if new_id is None:
                 duplicates += 1
-            else:
-                stored += 1
-                message_data = event.data if provider == "whatsapp" else event.data.get("message")
-                if (
-                    event.event_type == "message"
-                    and isinstance(message_data, dict)
-                    and message_data
-                ):
-                    pending_message_events.append(
-                        {
-                            "tenant_id": tenant_id,
-                            "message_id": event.event_id,
-                            "provider": provider,
-                            "occurred_at": datetime.now(UTC),
-                        }
-                    )
+                continue
 
-        # Acknowledge only after the events are durable.
+            stored += 1
+            if provider_impl is None:
+                mark_webhook_event_processed(new_id, session)
+                continue
+
+            jobs = await provider_impl.handle(
+                event,
+                session,
+                tenant_id,
+                integration_id,
+                new_id,
+            )
+
+            if jobs:
+                # Do not process before the receipt is durable. The job is
+                # scheduled only after the commit below.
+                deferred.extend(jobs)
+                mark_webhook_event_processing(new_id, session)
+            else:
+                mark_webhook_event_processed(new_id, session)
+
+        # Acknowledge only after all events are durable.
         session.commit()
 
     except Exception:
         session.rollback()
         raise
 
-    for event_payload in pending_message_events:
-        event_emitter.publish(EventName.MESSAGE_RECEIVED, event_payload)
+    # The transaction is committed: it is now safe to start provider I/O.
+    # Tests and direct callers without BackgroundTasks run the jobs inline so
+    # the receipt never stays stuck in "processing".
+    for job in deferred:
+        if background is not None:
+            background.add_task(job)
+        else:
+            await job()
 
     return {
         "stored": stored,
         "duplicates": duplicates,
+        "skipped": skipped,
     }
 
 
@@ -292,8 +328,14 @@ def verify_challenge(
     mode: str | None,
     token: str | None,
     challenge: str | None,
+    provider: str | None = None,
 ) -> str:
-    expected = settings.webhook_verify_token
+    if provider:
+        p = get_provider(provider)
+        if p is not None:
+            return p.verify_challenge(mode, token, challenge)
+
+    expected = settings.webhook_verify_token.get_secret_value()
 
     if (
         mode == "subscribe"
