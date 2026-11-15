@@ -5,8 +5,7 @@ from sqlalchemy.exc import DBAPIError
 
 from tests.cross_tenant.support import read_dotenv, rls_pending, set_tenant
 
-# These tables use purpose-specific policies instead of the standard tenant GUC policy:
-# refresh_tokens is pre-tenant; lead_forms exposes active public forms by public ID.
+# refresh_tokens and lead_forms resolve before tenant context exists (public endpoints)
 SPECIAL_TABLES = {"refresh_tokens", "lead_forms"}
 
 TENANT_TABLES_SQL = """

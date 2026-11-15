@@ -78,6 +78,7 @@ def test_apply_opt_out_records_state_cancels_followups_and_audits():
     actor_user_id = uuid.uuid4()
     session = MagicMock()
     session.scalar.return_value = lead
+    session.execute.return_value.scalar.return_value = None  # no tasks table in this context
 
     assert apply_opt_out(session, lead.id, "messenger", actor_user_id) is True
 

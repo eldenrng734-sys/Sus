@@ -159,7 +159,7 @@ Send `Idempotency-Key` on every retryable `POST`:
 
 - `POST /api/v1/leads`
 - `POST /api/v1/leads/import`
-- `POST /api/v1/messages`
+- `POST /api/v1/messages` (optional; see §9.2)
 - `POST /api/v1/tasks`
 - All mutating internal automation endpoints
 
@@ -169,6 +169,7 @@ Rules:
 - TTL: 24 hours.
 - Same key + same normalized body → replay the original status and body with `Idempotent-Replay: true`.
 - Same key + different body → `409 idempotency_conflict`.
+- `POST /api/v1/messages` is the exception: the key is optional, stored on the message row, scoped by `(tenant_id, idempotency_key)`, and reused for a different conversation → `409 idempotency_conflict` (see §9.2).
 - Webhooks are deduplicated by the provider event ID, not by `Idempotency-Key`.
 
 ### 2.7 Concurrency
@@ -1065,7 +1066,7 @@ Round-robin assignment is a server-side rule. It must be transactional and idemp
 { "reason": "Customer asked to stop messages" }
 ```
 
-`200 OK`; sets `opted_out = true`, records the opt-out timestamp and source, cancels open automated follow-up tasks, and adds an audit/timeline event. Outbound message attempts return `403 opt_out`; attempts without consent return `403 no_consent`.
+`200 OK`; sets `opted_out = true`, records the opt-out timestamp and source, cancels open automated follow-up tasks, and adds an audit/timeline event. Manual outbound message attempts return `403 opted_out`; automated follow-up still requires `consent = true` before queueing.
 
 ### 8.7 Timeline
 
@@ -1143,7 +1144,7 @@ Role scoping:
 
 ### 9.2 `POST /api/v1/messages`
 
-Requires `Idempotency-Key`.
+`Idempotency-Key` is optional. Send either free-form text (only inside the 24-hour reply window) or an approved template (outside the window).
 
 ```json
 {
@@ -1152,16 +1153,35 @@ Requires `Idempotency-Key`.
 }
 ```
 
-`202 Accepted`
+```json
+{
+  "conversation_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "template": {
+    "name": "demo_follow_up",
+    "language": "en_US",
+    "params": ["Ayesha", "Tuesday 3 PM"]
+  }
+}
+```
+
+`200 OK`
 
 ```json
 {
   "data": {
     "id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
     "conversation_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+    "provider": "whatsapp",
+    "provider_message_id": "wamid.HBgM...",
     "direction": "outbound",
-    "status": "queued",
-    "created_at": "2026-11-08T10:15:00Z"
+    "message_text": "Thanks Ayesha. Does Tuesday at 3 PM work for a demo?",
+    "status": "sent",
+    "error_code": null,
+    "idempotency_key": "send-8f14e45f",
+    "created_at": "2026-11-08T10:15:00Z",
+    "sent_at": "2026-11-08T10:15:01Z",
+    "delivered_at": null,
+    "read_at": null
   }
 }
 ```
@@ -1169,15 +1189,16 @@ Requires `Idempotency-Key`.
 Rules:
 
 - Caller must have access to the conversation's lead.
-- `opted_out = true` → `403 opt_out`.
-- `consent = false` → `403 no_consent`.
-- Conversation closed → `409 conversation_closed` unless the caller reopens it (not in MVP).
-- The message is persisted and queued; the provider send happens in a background worker.
-- Provider message IDs and delivery status are updated by webhooks.
+- `opted_out = true` → `403 opted_out`.
+- Free-form text requires an inbound message from the customer in the last 24 hours; otherwise `409 window_closed`. Approved templates bypass the window.
+- The message is persisted as `queued` before the provider call. The provider call happens outside the database transaction; the same row then becomes `sent` or `failed`.
+- A provider rejection returns `502 provider_error`; the persisted row keeps `status = "failed"` and a redacted `error_code`.
+- Retryable provider failures (`429`, `500`, `502`, `503`, `504`, and network timeouts) are retried with bounded backoff. Other `4xx` responses are never retried.
 - Text maximum 4,096 characters.
+- Reusing an `Idempotency-Key` for the same conversation returns the original row with `Idempotent-Replay: true`. Reusing it for a different conversation returns `409 idempotency_conflict`.
 - Outbound attachments are post-MVP. Inbound attachments are stored as private references and exposed as short-lived signed URLs in message responses.
 
-Errors: `409 idempotency_conflict`, `422 validation_error`, `503 provider_unavailable` only for explicit provider actions, not for queued messages.
+Errors: `403 opted_out`, `409 window_closed`, `409 idempotency_conflict`, `422 validation_error`, `502 provider_error`, `503 provider_not_configured`.
 
 ---
 
@@ -1353,6 +1374,8 @@ Generic body:
 
 Provider-specific credentials are validated, encrypted at rest, and never logged or returned. WhatsApp requires `phone_number_id`, `waba_id`, `access_token`, and `verify_token`; Meta requires `app_id`, `app_secret`, `access_token`, and `verify_token`. `201 Created` returns the integration shape. `502 provider_error` if the provider rejects the credentials.
 
+Meta (`provider_account_id` is the numeric Page ID) stores the Page access token first, then subscribes the app to the Page with `POST /{graph_version}/{page_id}/subscribed_apps` and `subscribed_fields=leadgen,messages,messaging_postbacks`. The token is sent as `Authorization: Bearer`, never in a URL. Required permissions: `leads_retrieval`, `ads_management`, `pages_manage_metadata`. Because credentials are committed before the subscription, a temporary Graph failure returns `502 provider_error` without losing the token; re-running connect retries the idempotent subscription.
+
 `POST /api/v1/integrations/{id}/test` (admin) performs a minimal provider check and returns `{ "data": { "status": "ok" } }` or `502`.
 
 `DELETE /api/v1/integrations/{id}` (admin) revokes the connection and returns `204`.
@@ -1417,15 +1440,22 @@ Processing contract:
 3. Resolve the tenant from the provider account/integration record, never from a request field.
 4. Insert the event into `webhook_events` with a unique provider event ID.
 5. If the event already exists, return `200` and do nothing.
-6. Validate and enqueue processing; return `200` quickly.
+6. Persist the receipt and any synchronous provider work in one transaction, then return `200` quickly. Unknown provider accounts are acknowledged and counted as `skipped` so the provider stops retrying.
 7. If persistence fails, return `500` so the provider retries.
+
+Meta specifics:
+
+- `object` must be `page`. `entry[].changes[field=leadgen]` records a receipt using `leadgen_id`. After that receipt commits, a background job fetches `GET /{graph_version}/{leadgen_id}?fields=field_data,ad_id,form_id` from Graph; the HTTP response does not wait for it.
+- Lead Ad capture uses `source=facebook_lead_ads`, `external_id=leadgen_id`, and `source_campaign=ad_id` (falling back to `form_id`). Unknown form fields are retained in interaction metadata. A form submission never sets `consent`; consent remains `false` until an explicit consent flow records it.
+- `entry[].messaging[]` inbound messages reuse the WhatsApp inbound pipeline with `channel=source=messenger` and the raw sender PSID as `external_contact_id`. Echoes, delivery receipts, and read receipts are ignored. Messenger outbound sending is not part of this contract.
+- Page subscription is handled by the connect endpoint; the webhook only processes Pages that already have an active integration.
+- If the background Lead Ad fetch or capture fails, the receipt is marked `failed` with a short, non-PII label such as `graph_500:2`. The webhook response is still `200`, and no partial lead is committed.
 
 Responses:
 
-- `200 {"status":"ok"}` — accepted or duplicate.
+- `200 {"status":"ok","stored":n,"duplicates":n,"skipped":n}` — accepted, duplicate, or unknown account.
 - `400 malformed_payload` — signature valid but body invalid.
 - `401 invalid_signature` — missing/invalid signature.
-- `403 unknown_provider_account` — no matching integration.
 - `413 payload_too_large`.
 
 Never trust tenant, lead, or user IDs in the webhook payload. Resolve and verify them server-side. Store only the minimum payload needed for retry; redact PII from logs.
@@ -1494,22 +1524,31 @@ Required headers:
 | `X-Service-Id` | `n8n` (allow-listed) |
 | `X-Tenant-ID` | Tenant UUID; resource ownership is still verified |
 | `X-Timestamp` | Unix seconds; reject if skew > 300 seconds |
-| `X-Idempotency-Key` | Unique per logical action; stored 24 hours |
+| `X-Idempotency-Key` | 8–128 characters; unique per logical action; stored 24 hours |
 | `X-Signature` | `sha256=<hex>` |
 
-Canonical string:
+Version 1 canonical string:
 
 ```text
+v1
+SERVICE_ID
+TENANT_ID
 METHOD
 PATH
 TIMESTAMP
+IDEMPOTENCY_KEY
 SHA256(raw_body)
 ```
 
-- `PATH` is the request path **including the query string** exactly as sent, e.g. `/internal/v1/automation/tasks/due?limit=50`.
-- For an empty body, use `SHA256(b"")`.
-- The signature is `HMAC-SHA256(secret, canonical_string)`, hex-encoded, and sent as `X-Signature: sha256=<hex>`.
+- Use UTF-8 bytes for the canonical string with a single LF between fields and no trailing LF.
+- `SERVICE_ID` and `TENANT_ID` are the exact header values; service IDs are allow-listed and tenant IDs use canonical lowercase UUID syntax.
+- `METHOD` is uppercase. `PATH` is the raw request path, including the query string exactly as sent and percent-encoded where required.
+- `TIMESTAMP` is the exact decimal Unix-seconds header value. `IDEMPOTENCY_KEY` is the exact header value.
+- `SHA256(raw_body)` is the lowercase hexadecimal SHA-256 digest of the exact request-body bytes. Do not parse and re-serialize JSON before hashing or sending.
+- Reject CR or LF in header values used as canonical fields.
+- The signature is `HMAC-SHA256(secret, canonical_string)`, hex-encoded, and sent as `X-Signature: sha256=<64 lowercase hex characters>`.
 - Compare in constant time. Reject missing/invalid signatures with `401`.
+- Reject timestamps more than 300 seconds from server time.
 - Reject replayed idempotency keys with `409` unless the request body is identical, in which case replay the stored response.
 
 ### 14.2 Internal endpoints
@@ -1568,6 +1607,8 @@ Notify a rep:
 ```
 
 `202 Accepted`. Notification bodies must not contain credentials, tokens, or full message histories.
+
+For `POST /internal/v1/automation/notifications`, the raw request body is limited to 16 KiB. The only supported `type` is `new_lead` and the only supported `entity_type` is `lead`. `title` must be 1–200 characters and `body` 1–2000 characters after trimming whitespace; both must be non-empty. The recipient must be an active Rep in the authenticated tenant and must currently own the referenced lead. Tenant, recipient and lead are validated server-side under the authenticated tenant context. Unknown fields or unsupported types are rejected with `422`; oversized bodies return `413`; an inactive/non-Rep recipient or lead ownership mismatch returns `403`; a tenant or lead not found within the tenant returns `404`; same key with a different body returns `409`. Authentication failures return `401`; an unconfigured service secret returns `503`. Success is `202 Accepted` with no response body.
 
 ### 14.3 FastAPI → n8n event contract
 

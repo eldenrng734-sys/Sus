@@ -100,6 +100,14 @@ class Message(UUIDPkMixin, TimestampMixin, Base):
             "conversation_id",
             "created_at",
         ),
+        # Outbound idempotency: one logical message per tenant + caller-supplied key.
+        Index(
+            "uq_messages_tenant_idempotency",
+            "tenant_id",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=text("idempotency_key IS NOT NULL"),
+        ),
     )
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
@@ -118,3 +126,5 @@ class Message(UUIDPkMixin, TimestampMixin, Base):
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     error_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Caller-supplied idempotency key for outbound sends; never reused across tenants.
+    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)

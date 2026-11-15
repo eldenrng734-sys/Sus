@@ -28,7 +28,15 @@ from tests.cross_tenant.support import (
     seed_tenant,
 )
 
-NEEDED_TABLES = {"tenants", "users", "tenant_memberships", "teams", "leads", "refresh_tokens"}
+NEEDED_TABLES = {
+    "tenants",
+    "users",
+    "tenant_memberships",
+    "teams",
+    "leads",
+    "notifications",
+    "refresh_tokens",
+}
 
 
 @pytest.fixture(scope="session", autouse=True)

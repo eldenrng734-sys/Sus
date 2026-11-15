@@ -12,6 +12,7 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.outbox import emit_lead_created as _enqueue_lead_created
 from app.modules.leads.capture_normalize import (
     InvalidContact,
     clean_name,
@@ -121,6 +122,12 @@ def capture_lead(
     return CaptureResult(lead=lead, created=created, matched_on=matched_on, conflicts=conflicts)
 
 
+def emit_lead_created(db: Session, lead: Lead, actor_user_id: uuid.UUID | None) -> None:
+    _enqueue_lead_created(
+        db, tenant_id=lead.tenant_id, lead_id=lead.id, source=lead.source
+    )
+
+
 # --- internals -------------------------------------------------------------
 
 
@@ -150,7 +157,7 @@ def _validate(data: CaptureInput) -> dict:
         raise CaptureError(str(exc)) from exc
     if len(name) > 200:
         raise CaptureError("name is too long (max 200)")
-    if not email and not phone:
+    if not email and not phone and not _has_provider_identity(data.source, data.external_id):
         raise CaptureError("email or phone is required")
     if data.source not in VALID_SOURCES:
         raise CaptureError(f"unknown source: {data.source}")
@@ -181,6 +188,11 @@ def _validate(data: CaptureInput) -> dict:
         "assigned_user_id": data.assigned_user_id,
         "team_id": data.team_id,
     }
+
+
+def _has_provider_identity(source: str, external_id: str | None) -> bool:
+    """Lead Ads / Messenger leads can be identified by their provider ID alone."""
+    return source in {"facebook_lead_ads", "messenger"} and bool((external_id or "").strip())
 
 
 def _lock_keys(db: Session, tenant_id: uuid.UUID, clean: dict) -> None:
