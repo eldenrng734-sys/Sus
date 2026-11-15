@@ -1,3 +1,4 @@
+from app.core.outbox_models import OutboxEvent  # noqa: F401
 from app.modules.ai.models import LeadAssessment  # noqa: F401
 from app.modules.audit.models import AuditLog  # noqa: F401
 from app.modules.auth import models as _auth_models  # noqa: F401
