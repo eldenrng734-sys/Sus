@@ -1,25 +1,34 @@
-﻿"use client";
+"use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  Search, Plus, Users, Download,
-  X, UserPlus,
-} from "lucide-react";
+import { Plus, Search, UserPlus } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
+import { fetchLeads } from "@/lib/leads-api";
 
 type Lead = {
   id: string;
   name: string;
-  email: string;
-  company: string;
+  email: string | null;
+  phone: string | null;
+  company_name: string | null;
   source: string;
   status: string;
   priority: string;
-  assigned: string;
+  assigned_user_id: string | null;
 };
 
-const initialLeads: Lead[] = [];
+const statuses = ["new", "contacted", "qualified", "proposal", "won", "lost"];
+const priorities = ["low", "medium", "high"];
+const sources = [
+  "website_form",
+  "tracking",
+  "whatsapp",
+  "facebook_lead_ads",
+  "messenger",
+  "manual",
+  "csv",
+];
 
 const statusStyles: Record<string, string> = {
   new: "bg-blue-50 text-blue-700",
@@ -36,61 +45,87 @@ const priorityStyles: Record<string, string> = {
   low: "bg-slate-100 text-slate-600",
 };
 
+function formatOption(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 export default function LeadsPage() {
-  const [leads, setLeads] = useState<Lead[]>(initialLeads);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
-  const [priority, setPriority] = useState("all");
-  const [showForm, setShowForm] = useState(false);
+  const [status, setStatus] = useState("");
+  const [priority, setPriority] = useState("");
+  const [source, setSource] = useState("");
+  const [owner, setOwner] = useState("");
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [cursorStack, setCursorStack] = useState<(string | null)[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    company: "",
-    source: "manual",
-    priority: "medium",
-  });
+  useEffect(() => {
+    let cancelled = false;
 
-  const filteredLeads = useMemo(() => {
-    return leads.filter((lead) => {
-      const query = search.toLowerCase();
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      setError("");
 
-      const matchesSearch =
-        lead.name.toLowerCase().includes(query) ||
-        lead.email.toLowerCase().includes(query) ||
-        lead.company.toLowerCase().includes(query);
+      try {
+        const params = new URLSearchParams({ limit: "25" });
+        if (search.trim()) params.set("q", search.trim());
+        if (status) params.set("status", status);
+        if (priority) params.set("priority", priority);
+        if (source) params.set("source", source);
+        if (owner.trim()) params.set("assigned_user_id", owner.trim());
+        if (cursor) params.set("cursor", cursor);
 
-      return (
-        matchesSearch &&
-        (status === "all" || lead.status === status) &&
-        (priority === "all" || lead.priority === priority)
-      );
-    });
-  }, [leads, search, status, priority]);
+        const result = await fetchLeads<Lead>(params);
 
-  function handleAddLead(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+        if (!cancelled) {
+          setLeads(result.data);
+          setNextCursor(result.meta.next_cursor);
+          setHasMore(result.meta.has_more);
+        }
+      } catch (requestError) {
+        if (!cancelled) {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Could not load leads.",
+          );
+          setLeads([]);
+          setNextCursor(null);
+          setHasMore(false);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 300);
 
-    const newLead: Lead = {
-      id: crypto.randomUUID(),
-      name: form.name,
-      email: form.email,
-      company: form.company,
-      source: form.source,
-      status: "new",
-      priority: form.priority,
-      assigned: "Unassigned",
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
     };
+  }, [search, status, priority, source, owner, cursor]);
 
-    setLeads((current) => [newLead, ...current]);
-    setForm({
-      name: "",
-      email: "",
-      company: "",
-      source: "manual",
-      priority: "medium",
-    });
-    setShowForm(false);
+  function resetPagination() {
+    setCursor(null);
+    setCursorStack([]);
+  }
+
+  function goToNextPage() {
+    if (!hasMore || !nextCursor) return;
+    setCursorStack((stack) => [...stack, cursor]);
+    setCursor(nextCursor);
+  }
+
+  function goToPreviousPage() {
+    if (cursorStack.length === 0) return;
+    const previousCursor = cursorStack[cursorStack.length - 1];
+    setCursorStack((stack) => stack.slice(0, -1));
+    setCursor(previousCursor);
   }
 
   return (
@@ -101,15 +136,19 @@ export default function LeadsPage() {
         <header className="flex min-h-20 items-center justify-between border-b border-slate-200 bg-white px-6 sm:px-8">
           <div>
             <p className="text-sm text-slate-500">
-              <Link href="/" className="hover:text-blue-600">Workspace</Link>
+              <Link href="/" className="hover:text-blue-600">
+                Workspace
+              </Link>
               {" / Leads"}
             </p>
             <h1 className="mt-1 text-xl font-bold text-slate-900">
               Lead Management
             </h1>
           </div>
-
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700">
+          <div
+            aria-hidden="true"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700"
+          >
             U
           </div>
         </header>
@@ -122,100 +161,130 @@ export default function LeadsPage() {
                 Manage and track your potential customers.
               </p>
             </div>
-
-            <button
-              onClick={() => setShowForm(true)}
+            <Link
+              href="/leads/new"
               className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
             >
               <Plus size={18} />
               Add New Lead
-            </button>
+            </Link>
           </section>
 
           <section className="grid gap-4 sm:grid-cols-3">
-            <article className="rounded-xl border border-slate-200 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-500">Total Leads</p>
-                <Users size={19} className="text-blue-600" />
-              </div>
-              <p className="mt-3 text-2xl font-bold text-slate-900">
-                {leads.length}
-              </p>
-            </article>
-
-            <article className="rounded-xl border border-slate-200 bg-white p-5">
-              <p className="text-sm text-slate-500">New Leads</p>
-              <p className="mt-3 text-2xl font-bold text-slate-900">
-                {leads.filter((lead) => lead.status === "new").length}
-              </p>
-            </article>
-
-            <article className="rounded-xl border border-slate-200 bg-white p-5">
-              <p className="text-sm text-slate-500">High Priority</p>
-              <p className="mt-3 text-2xl font-bold text-slate-900">
-                {leads.filter((lead) => lead.priority === "high").length}
-              </p>
-            </article>
+            {[
+              { label: "Leads on this page", value: leads.length },
+              {
+                label: "New on this page",
+                value: leads.filter((lead) => lead.status === "new").length,
+              },
+              {
+                label: "High priority on this page",
+                value: leads.filter((lead) => lead.priority === "high").length,
+              },
+            ].map((metric) => (
+              <article
+                key={metric.label}
+                className="rounded-xl border border-slate-200 bg-white p-5"
+              >
+                <p className="text-sm text-slate-500">{metric.label}</p>
+                <p className="mt-3 text-2xl font-bold text-slate-900">
+                  {loading ? "--" : metric.value}
+                </p>
+              </article>
+            ))}
           </section>
 
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 p-5">
-              <div>
-                <h3 className="font-semibold text-slate-900">All Leads</h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  {filteredLeads.length} records shown
-                </p>
-              </div>
-
-              <button
-                onClick={() => setShowForm(true)}
-                className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
-                <Download size={16} />
-                Export
-              </button>
+            <div className="border-b border-slate-100 p-5">
+              <h3 className="font-semibold text-slate-900">All Leads</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                {loading ? "Loading records..." : `${leads.length} records shown`}
+              </p>
             </div>
 
-            <div className="flex flex-col gap-3 border-b border-slate-100 p-5 lg:flex-row">
-              <div className="relative flex-1">
+            <div className="grid gap-3 border-b border-slate-100 p-5 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="relative sm:col-span-2 xl:col-span-1">
                 <Search
                   size={18}
+                  aria-hidden="true"
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                 />
                 <input
+                  type="search"
+                  aria-label="Search leads"
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search by name, email or company..."
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    resetPagination();
+                  }}
+                  placeholder="Search leads..."
+                  maxLength={100}
                   className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                <select
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-600 outline-none focus:border-blue-500"
-                >
-                  <option value="all">All statuses</option>
-                  <option value="new">New</option>
-                  <option value="contacted">Contacted</option>
-                  <option value="qualified">Qualified</option>
-                  <option value="proposal">Proposal</option>
-                  <option value="won">Won</option>
-                  <option value="lost">Lost</option>
-                </select>
+              <select
+                aria-label="Filter by status"
+                value={status}
+                onChange={(event) => {
+                  setStatus(event.target.value);
+                  resetPagination();
+                }}
+                className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-600 outline-none focus:border-blue-500"
+              >
+                <option value="">All statuses</option>
+                {statuses.map((item) => (
+                  <option key={item} value={item}>
+                    {formatOption(item)}
+                  </option>
+                ))}
+              </select>
 
-                <select
-                  value={priority}
-                  onChange={(event) => setPriority(event.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-600 outline-none focus:border-blue-500"
-                >
-                  <option value="all">All priorities</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-              </div>
+              <select
+                aria-label="Filter by priority"
+                value={priority}
+                onChange={(event) => {
+                  setPriority(event.target.value);
+                  resetPagination();
+                }}
+                className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-600 outline-none focus:border-blue-500"
+              >
+                <option value="">All priorities</option>
+                {priorities.map((item) => (
+                  <option key={item} value={item}>
+                    {formatOption(item)}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                aria-label="Filter by source"
+                value={source}
+                onChange={(event) => {
+                  setSource(event.target.value);
+                  resetPagination();
+                }}
+                className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-600 outline-none focus:border-blue-500"
+              >
+                <option value="">All sources</option>
+                {sources.map((item) => (
+                  <option key={item} value={item}>
+                    {formatOption(item)}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                aria-label="Filter by assigned user ID"
+                type="text"
+                placeholder="Assigned user ID"
+                value={owner}
+                onChange={(event) => {
+                  setOwner(event.target.value);
+                  resetPagination();
+                }}
+                className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+              />
             </div>
 
             <div className="overflow-x-auto">
@@ -230,43 +299,75 @@ export default function LeadsPage() {
                     <th className="px-5 py-4 font-medium">Assigned to</th>
                   </tr>
                 </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {!loading &&
+                    !error &&
+                    leads.map((lead) => (
+                      <tr key={lead.id} className="hover:bg-slate-50">
+                        <td className="px-5 py-4">
+                          <Link
+                            href={`/leads/${lead.id}`}
+                            className="font-semibold text-slate-800 hover:text-blue-600"
+                          >
+                            {lead.name}
+                          </Link>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {lead.email || lead.phone || "No contact details"}
+                          </p>
+                        </td>
+                        <td className="px-5 py-4 text-slate-600">
+                          {lead.company_name || "--"}
+                        </td>
+                        <td className="px-5 py-4 capitalize text-slate-600">
+                          {formatOption(lead.source)}
+                        </td>
+                        <td className="px-5 py-4">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${statusStyles[lead.status] ?? "bg-slate-100 text-slate-600"}`}
+                          >
+                            {formatOption(lead.status)}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${priorityStyles[lead.priority] ?? "bg-slate-100 text-slate-600"}`}
+                          >
+                            {formatOption(lead.priority)}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-slate-600">
+                          {lead.assigned_user_id ? "Assigned" : "Unassigned"}
+                        </td>
+                      </tr>
+                    ))}
 
-                <tbody>
-                  {filteredLeads.map((lead) => (
-                    <tr key={lead.id} className="border-t border-slate-100 hover:bg-slate-50">
-                      <td className="px-5 py-4">
-                        <p className="font-semibold text-slate-800">{lead.name}</p>
-                        <p className="mt-1 text-xs text-slate-500">{lead.email}</p>
-                      </td>
-                      <td className="px-5 py-4 text-slate-600">{lead.company || "--"}</td>
-                      <td className="px-5 py-4 capitalize text-slate-600">{lead.source.replaceAll("_", " ")}</td>
-                      <td className="px-5 py-4">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${statusStyles[lead.status]}`}>
-                          {lead.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${priorityStyles[lead.priority]}`}>
-                          {lead.priority}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-slate-600">{lead.assigned}</td>
-                    </tr>
-                  ))}
-
-                  {filteredLeads.length === 0 && (
+                  {!loading && !error && leads.length === 0 && (
                     <tr>
                       <td colSpan={6} className="px-5 py-16 text-center">
                         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                          <UserPlus size={23} />
+                          <UserPlus size={23} aria-hidden="true" />
                         </div>
                         <p className="mt-3 font-medium text-slate-700">
-                          {leads.length === 0 ? "No leads yet" : "No matching leads"}
+                          No leads found
                         </p>
                         <p className="mt-1 text-sm text-slate-400">
-                          {leads.length === 0
-                            ? "Add your first lead to get started."
-                            : "Try changing your search or filters."}
+                          Try changing your search or filters, or add a new lead.
+                        </p>
+                      </td>
+                    </tr>
+                  )}
+                  {loading && (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-16 text-center text-slate-500">
+                        Loading leads...
+                      </td>
+                    </tr>
+                  )}
+                  {!loading && error && (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-8 text-center">
+                        <p role="alert" className="text-sm text-red-700">
+                          {error}
                         </p>
                       </td>
                     </tr>
@@ -275,124 +376,37 @@ export default function LeadsPage() {
               </table>
             </div>
           </section>
-        </div>
-      </main>
 
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Add New Lead</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Enter the customer&apos;s basic information.
-                </p>
-              </div>
-              <button
-                onClick={() => setShowForm(false)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                aria-label="Close form"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddLead} className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Full name *
-                </label>
-                <input
-                  required
-                  value={form.name}
-                  onChange={(event) => setForm({ ...form, name: event.target.value })}
-                  placeholder="Customer name"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Email address
-                </label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(event) => setForm({ ...form, email: event.target.value })}
-                  placeholder="customer@example.com"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Company
-                </label>
-                <input
-                  value={form.company}
-                  onChange={(event) => setForm({ ...form, company: event.target.value })}
-                  placeholder="Company name"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Source
-                  </label>
-                  <select
-                    value={form.source}
-                    onChange={(event) => setForm({ ...form, source: event.target.value })}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                  >
-                    <option value="manual">Manual</option>
-                    <option value="website_form">Website form</option>
-                    <option value="whatsapp">WhatsApp</option>
-                    <option value="facebook_lead_ads">Facebook Lead Ads</option>
-                    <option value="csv">CSV</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Priority
-                  </label>
-                  <select
-                    value={form.priority}
-                    onChange={(event) => setForm({ ...form, priority: event.target.value })}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
-                </div>
-              </div>
-
-              <p className="text-xs text-slate-400">
-                This is a UI-only draft. It is not saved to the backend yet.
+          {!loading && !error && (
+            <nav
+              aria-label="Lead list pagination"
+              className="flex flex-wrap items-center justify-between gap-3"
+            >
+              <p className="text-sm text-slate-500">
+                Showing {leads.length} leads on this page
               </p>
-
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
-                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                  disabled={cursorStack.length === 0}
+                  onClick={goToPreviousPage}
+                  className="rounded-lg bg-slate-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
-                  Cancel
+                  Previous
                 </button>
                 <button
-                  type="submit"
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                  type="button"
+                  disabled={!hasMore || !nextCursor}
+                  onClick={goToNextPage}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
-                  Add Lead
+                  Next
                 </button>
               </div>
-            </form>
-          </div>
+            </nav>
+          )}
         </div>
-      )}
+      </main>
     </div>
   );
 }
