@@ -1,10 +1,12 @@
 import uuid
 from datetime import UTC, datetime
+from math import nan
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
+from app.core.config import settings
 from app.modules.ai import rules
 from app.modules.ai import service as assessment_service
 from app.modules.ai.models import LeadAssessment
@@ -78,6 +80,7 @@ def test_score_requires_at_least_one_sales_classification_signal():
     ("values", "status", "expected"),
     [
         ({"confidence": 0.59}, "ok", True),
+        ({"confidence": 0.6}, "ok", False),
         ({"confidence": 0.9}, "fallback", True),
         ({"confidence": 0.9, "category": "spam"}, "ok", True),
         ({"confidence": 0.9, "intent": "complaint"}, "ok", True),
@@ -89,6 +92,25 @@ def test_review_policy_handles_confidence_provider_and_risk_signals(values, stat
     assessment = AssessmentOutput.model_validate(values)
 
     assert rules.requires_human_review(assessment, status) is expected
+
+
+@pytest.mark.parametrize("confidence", [None, nan, -0.01, 1.01])
+def test_invalid_or_missing_confidence_requires_human_review(confidence):
+    assessment = SimpleNamespace(
+        confidence=confidence,
+        category=None,
+        intent=None,
+        sentiment=None,
+    )
+
+    assert rules.requires_human_review(assessment, "ok") is True
+
+
+def test_review_threshold_uses_central_configuration(monkeypatch):
+    monkeypatch.setattr(settings, "ai_review_confidence_threshold", 0.9)
+    assessment = AssessmentOutput.model_validate({"confidence": 0.8})
+
+    assert rules.requires_human_review(assessment, "ok") is True
 
 
 @pytest.mark.parametrize(
@@ -139,6 +161,7 @@ def test_persist_assessment_replaces_model_score_and_priority():
     assert assessment.raw_output["priority"] == "high"
     assert assessment.needs_human_review is False
     assert assessment.review_status == "not_required"
+    assert assessment.prompt_version == "test-prompt"
 
 
 def test_conversation_only_assessment_does_not_project_score_or_priority():

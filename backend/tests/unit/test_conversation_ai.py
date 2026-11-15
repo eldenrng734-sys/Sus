@@ -72,7 +72,7 @@ def test_analyze_conversation_redacts_pii_persists_and_returns_analysis(monkeypa
     assert result.summary == "The customer requested a demo."
     assert result.sentiment == "positive"
     assert result.model == "gpt-test"
-    assert result.prompt_version == "lead-assessment-v2"
+    assert result.prompt_version == "lead-assessment-v3"
     assert "Ayesha" not in prompts["user"]
     assert "ayesha@example.com" not in prompts["user"]
     assert "415-555-0199" not in prompts["user"]

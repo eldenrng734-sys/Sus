@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
     llm_input_price_per_mtok: float = 0.0
     llm_output_price_per_mtok: float = 0.0
+    ai_review_confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[3] / ".env",

@@ -1,9 +1,11 @@
 import uuid
+from math import isfinite
 from typing import Protocol
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.modules.ai.models import LeadAssessment
 from app.modules.leads.models import Lead
 from app.modules.tasks.service import create_assessment_follow_up
@@ -65,10 +67,14 @@ def has_lead_scoring_signals(assessment: AssessmentSignals) -> bool:
 
 def requires_human_review(assessment: AssessmentSignals, status: str) -> bool:
     """Require review for uncertain/provider-failure results and risky classifications."""
+    confidence = assessment.confidence
+    valid_confidence = (
+        isinstance(confidence, (int, float)) and isfinite(confidence) and 0 <= confidence <= 1
+    )
+    if status != "ok" or not valid_confidence:
+        return True
     return (
-        status != "ok"
-        or assessment.confidence is None
-        or assessment.confidence < 0.6
+        confidence < settings.ai_review_confidence_threshold
         or assessment.category in HIGH_RISK_CATEGORIES
         or assessment.intent in HIGH_RISK_INTENTS
         or assessment.sentiment == "negative"
