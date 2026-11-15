@@ -3,12 +3,29 @@
 import uuid
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.database.session import set_tenant_context
 from app.modules.leads.capture import CaptureError, CaptureInput, capture_lead
 from app.modules.leads.models import Interaction, Lead
+
+
+def _lead_created_count(db):
+    return db.execute(
+        text("SELECT count(*) FROM outbox_events WHERE event_type = 'lead.created'")
+    ).scalar()
+
+
+def test_new_lead_queues_exactly_one_lead_created_event(db, seed):
+    _as_tenant(db, seed.a)
+    before = _lead_created_count(db)
+    email = f"{_uniq()}@example.com"
+    capture_lead(db, tenant_id=seed.a.id, data=CaptureInput(name="Q", email=email))
+    assert _lead_created_count(db) == before + 1
+    # Capturing the same person again finds the existing lead: no second event
+    capture_lead(db, tenant_id=seed.a.id, data=CaptureInput(name="Q", email=email))
+    assert _lead_created_count(db) == before + 1
 
 
 @pytest.fixture

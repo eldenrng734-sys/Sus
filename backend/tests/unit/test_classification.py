@@ -15,6 +15,7 @@ GOOD = {
     "intent": "request_demo",
     "interest": "CRM software",
     "buying_stage": "consideration",
+    "sentiment": "positive",
     "recommended_action": "schedule_demo",
     "follow_up_days": 0,
     "confidence": 0.94,
@@ -56,8 +57,37 @@ def test_valid_json_is_accepted():
     assert outcome.status == "ok"
     assert outcome.output.intent == "request_demo"
     assert outcome.needs_human_review is False
-    assert outcome.prompt_version == "classify-v1"
+    assert outcome.prompt_version == "classify-v2"
     assert outcome.model == "fake-model"
+    assert set(outcome.output.model_dump()) == {
+        "category",
+        "intent",
+        "interest",
+        "buying_stage",
+        "sentiment",
+        "recommended_action",
+        "follow_up_days",
+        "confidence",
+    }
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "I need pricing for CRM software.",
+        "\u09a1\u09c7\u09ae\u09cb \u09a6\u09c7\u0996\u09a4\u09c7 \u099a\u09be\u0987",
+        "\u0986\u09ae\u09be\u09a6\u09c7\u09b0 team needs a demo next week.",
+    ],
+)
+def test_prompt_v2_accepts_english_bangla_and_mixed_messages(message):
+    client = FakeClient(GOOD)
+
+    outcome = classify_message(message, client=client)
+
+    assert outcome.status == "ok"
+    assert outcome.output.intent == "request_demo"
+    assert client.calls[0]["user"].find(message) >= 0
+    assert "English, Bangla, or a mix" in client.calls[0]["system"]
 
 
 def test_json_inside_a_code_fence_is_accepted():
@@ -71,13 +101,41 @@ def test_low_confidence_needs_review():
 
 
 @pytest.mark.parametrize(
+    ("confidence", "needs_review"),
+    [(0.8, False), (0.6, False), (0.5999, True)],
+)
+def test_classifier_confidence_threshold_boundary(confidence, needs_review):
+    outcome = run({**GOOD, "confidence": confidence})
+
+    assert outcome.needs_human_review is needs_review
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"category": "spam"},
+        {"category": "unknown"},
+        {"intent": "complaint"},
+        {"intent": "unknown"},
+        {"sentiment": "negative"},
+    ],
+)
+def test_classifier_safety_rules_override_high_confidence(override):
+    outcome = run({**GOOD, **override, "confidence": 0.99})
+
+    assert outcome.needs_human_review is True
+
+
+@pytest.mark.parametrize(
     "bad",
     [
         {**GOOD, "intent": "buy_now"},
         {**GOOD, "confidence": 1.5},
+        {**GOOD, "confidence": float("nan")},
         {**GOOD, "follow_up_days": -1},
-        {**GOOD, "sentiment": "positive"},
+        {**GOOD, "sentiment": "unknown"},
         {k: v for k, v in GOOD.items() if k != "category"},
+        {k: v for k, v in GOOD.items() if k != "confidence"},
         "I think this customer wants a demo.",
         "",
     ],
@@ -129,7 +187,7 @@ def test_customer_cannot_close_the_data_tag_early():
 
 
 def test_prompt_lists_every_allowed_value():
-    for name in ("Category", "Intent", "BuyingStage", "Action"):
+    for name in ("Category", "Intent", "BuyingStage", "Sentiment", "Action"):
         for value in get_args(getattr(classification, name)):
             assert f'"{value}"' in CLASSIFY_SYSTEM_PROMPT
 

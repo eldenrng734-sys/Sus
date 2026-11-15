@@ -24,30 +24,18 @@ class ConversationOut(BaseModel):
     created_at: datetime
 
 
-class ConversationAnalysisOut(BaseModel):
-    summary: str
-    sentiment: Literal["positive", "neutral", "negative"]
-    confidence: float | None
-    needs_human_review: bool
-    status: str
-    model: str
-    prompt_version: str
-    created_at: datetime
-
-
-class MessageCreate(BaseModel):
-    conversation_id: uuid.UUID
-    message_text: str = Field(min_length=1, max_length=4096)
-
-
 class MessageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     conversation_id: uuid.UUID
+    provider: str
+    provider_message_id: str | None
     direction: str
     message_text: str | None
     status: str
+    error_code: str | None
+    idempotency_key: str | None
     created_at: datetime
     sent_at: datetime | None
     delivered_at: datetime | None

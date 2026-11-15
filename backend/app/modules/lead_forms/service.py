@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from app.core.events import EventName, event_emitter
 from app.database.session import set_tenant_context
 from app.modules.lead_forms.models import LeadForm
 from app.modules.lead_forms.schemas import PublicFormSubmission
@@ -77,6 +78,15 @@ def submit_public_form(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     session.commit()
+    if result.created:
+        event_emitter.publish(
+            EventName.LEAD_CREATED,
+            {
+                "tenant_id": form.tenant_id,
+                "lead_id": result.lead.id,
+                "occurred_at": result.lead.created_at,
+            },
+        )
     return {"data": {"id": str(result.lead.id)}}
 
 

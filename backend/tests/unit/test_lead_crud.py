@@ -72,12 +72,19 @@ def test_create_lead_saves_lead_note_audit_and_idempotent_response(monkeypatch):
     context = make_context()
     key_id = uuid.uuid4()
     stored = {}
+    published = []
+
+    def publish(name, payload):
+        assert session.commit.call_count == 1
+        published.append((name, payload))
+
     monkeypatch.setattr(crud, "_claim_create_idempotency", lambda *args: (key_id, None))
     monkeypatch.setattr(
         crud,
         "_store_create_response",
         lambda _session, _key_id, body: stored.update(body),
     )
+    monkeypatch.setattr(crud.event_emitter, "publish", publish)
     session.scalar.return_value = None
 
     body = LeadCreate(
@@ -105,13 +112,21 @@ def test_create_lead_saves_lead_note_audit_and_idempotent_response(monkeypatch):
     assert lead.consent_source == "manual"
     assert {item.type for item in interactions} == {"lead_created", "note"}
     assert any(item.action == "lead.created" for item in audits)
+    assert len(published) == 1
+    event_name, event_payload = published[0]
+    assert event_name.value == "lead.created"
+    assert event_payload["tenant_id"] == context.tenant_id
+    assert event_payload["lead_id"] == lead.id
+    assert event_payload["occurred_at"] == lead.created_at
 
 
 def test_create_lead_replays_existing_idempotency_response(monkeypatch):
     session = MagicMock()
     context = make_context()
     previous = {"id": str(uuid.uuid4()), "name": "Previously created"}
+    publish = MagicMock()
     monkeypatch.setattr(crud, "_claim_create_idempotency", lambda *args: (None, previous))
+    monkeypatch.setattr(crud.event_emitter, "publish", publish)
 
     result, replay = crud.create_lead(
         session,
@@ -124,6 +139,30 @@ def test_create_lead_replays_existing_idempotency_response(monkeypatch):
     assert result == previous
     session.add.assert_not_called()
     session.commit.assert_not_called()
+    publish.assert_not_called()
+
+
+def test_create_lead_does_not_publish_when_commit_fails(monkeypatch):
+    session = MagicMock()
+    attach_defaults(session)
+    context = make_context()
+    publish = MagicMock()
+    monkeypatch.setattr(crud, "_claim_create_idempotency", lambda *args: (uuid.uuid4(), None))
+    monkeypatch.setattr(crud, "_store_create_response", lambda *args: None)
+    monkeypatch.setattr(crud.event_emitter, "publish", publish)
+    session.scalar.return_value = None
+    session.commit.side_effect = RuntimeError("commit failed")
+
+    with pytest.raises(RuntimeError, match="commit failed"):
+        crud.create_lead(
+            session,
+            context,
+            LeadCreate(name="Ayesha", email="ayesha@example.com"),
+            "request-key-123",
+        )
+
+    session.rollback.assert_called_once()
+    publish.assert_not_called()
 
 
 def test_create_lead_rejects_duplicate_within_tenant(monkeypatch):

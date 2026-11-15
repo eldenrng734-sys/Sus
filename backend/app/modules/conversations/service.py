@@ -1,5 +1,4 @@
 import uuid
-from datetime import UTC, datetime
 
 from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
@@ -21,15 +20,10 @@ from app.modules.conversations.schemas import (
     ConversationAnalysisOut,
     ConversationCreate,
     ConversationOut,
-    MessageCreate,
     MessageOut,
     TimelineEvent,
 )
 from app.modules.leads.models import Interaction, Lead
-from app.modules.leads.optout import can_message
-
-# messages.provider only allows these two (see the DB check constraint)
-MESSAGE_CHANNELS = ("whatsapp", "messenger")
 
 
 def _get_lead(session: Session, context: TenantContext, lead_id: uuid.UUID) -> Lead:
@@ -139,151 +133,6 @@ def list_messages(
         .offset(offset)
     )
     return [MessageOut.model_validate(m) for m in session.scalars(stmt)]
-
-
-def analyze_conversation(
-    session: Session,
-    context: TenantContext,
-    conversation_id: uuid.UUID,
-) -> ConversationAnalysisOut:
-    conversation = _get_conversation(session, context, conversation_id)
-    lead = _get_lead(session, context, conversation.lead_id)
-    messages = list(
-        session.scalars(
-            select(Message)
-            .where(
-                Message.tenant_id == context.tenant_id,
-                Message.conversation_id == conversation.id,
-                Message.message_text.is_not(None),
-            )
-            .order_by(Message.created_at.desc(), Message.id.desc())
-            .limit(100)
-        )
-    )
-    content = [
-        f"{'Customer' if message.direction == 'inbound' else 'Agent'}: {message.message_text}"
-        for message in reversed(messages)
-        if message.message_text and message.message_text.strip()
-    ]
-    if not content:
-        raise AuthError(422, "validation_error", "Conversation has no messages to analyze")
-
-    prompt = build_assessment_prompt(
-        _bounded_conversation(content),
-        pii_values=(lead.name, lead.email or "", lead.phone or ""),
-    )
-    if settings.openai_api_key is None or not settings.openai_api_key.get_secret_value().strip():
-        raise AuthError(503, "service_unavailable", "AI conversation analysis is not configured")
-
-    api_key = settings.openai_api_key.get_secret_value()
-    model = settings.openai_model
-    lead_id = lead.id
-    scoped_conversation_id = conversation.id
-    pii_values = (lead.name, lead.email or "", lead.phone or "")
-    session.commit()
-    try:
-        output = analyze_with_openai(
-            prompt,
-            api_key=api_key,
-            model=model,
-            timeout_seconds=settings.openai_timeout_seconds,
-        )
-    except AIProviderError:
-        raise AuthError(502, "provider_error", "AI conversation analysis failed") from None
-
-    assessment = persist_assessment(
-        session,
-        tenant_id=context.tenant_id,
-        lead_id=lead_id,
-        conversation_id=scoped_conversation_id,
-        output=output,
-        model=model,
-        prompt_version=PROMPT_VERSION,
-        pii_values=pii_values,
-    )
-    session.commit()
-    return _conversation_analysis_out(assessment)
-
-
-def get_conversation_analysis(
-    session: Session,
-    context: TenantContext,
-    conversation_id: uuid.UUID,
-) -> ConversationAnalysisOut:
-    conversation = _get_conversation(session, context, conversation_id)
-    assessment = session.scalar(
-        select(LeadAssessment)
-        .where(
-            LeadAssessment.tenant_id == context.tenant_id,
-            LeadAssessment.conversation_id == conversation.id,
-        )
-        .order_by(LeadAssessment.created_at.desc(), LeadAssessment.id.desc())
-        .limit(1)
-    )
-    if assessment is None:
-        raise AuthError(404, "not_found", "Conversation analysis not found")
-    return _conversation_analysis_out(assessment)
-
-
-def _bounded_conversation(messages: list[str]) -> list[str]:
-    remaining = 20_000
-    selected = []
-    for message in reversed(messages[-100:]):
-        excerpt = message[-4_000:]
-        excerpt = excerpt[-remaining:]
-        if not excerpt:
-            break
-        selected.append(excerpt)
-        remaining -= len(excerpt)
-        if remaining == 0:
-            break
-    return list(reversed(selected))
-
-
-def _conversation_analysis_out(assessment: LeadAssessment) -> ConversationAnalysisOut:
-    if assessment.summary is None or assessment.sentiment is None:
-        raise AuthError(404, "not_found", "Conversation analysis not found")
-    return ConversationAnalysisOut(
-        summary=assessment.summary,
-        sentiment=assessment.sentiment,
-        confidence=float(assessment.confidence) if assessment.confidence is not None else None,
-        needs_human_review=assessment.needs_human_review,
-        status=assessment.status,
-        model=assessment.model,
-        prompt_version=assessment.prompt_version,
-        created_at=assessment.created_at,
-    )
-
-
-def send_message(session: Session, context: TenantContext, body: MessageCreate) -> MessageOut:
-    """Store an outbound message as 'queued'. Real sending is added on Day 7."""
-    conversation = _get_conversation(session, context, body.conversation_id)
-    if conversation.channel not in MESSAGE_CHANNELS:
-        raise AuthError(
-            422, "validation_error", "Messages are only supported on WhatsApp and Messenger"
-        )
-    lead = _get_lead(session, context, conversation.lead_id)
-    allowed, reason = can_message(lead)
-    if not allowed:
-        if reason == "opt_out":
-            raise AuthError(403, "opt_out", "This lead has opted out of messages")
-        raise AuthError(403, "no_consent", "This lead has not consented to messages")
-
-    message = Message(
-        tenant_id=context.tenant_id,
-        conversation_id=conversation.id,
-        provider=conversation.channel,
-        direction="outbound",
-        message_text=body.message_text,
-        status="queued",
-    )
-    session.add(message)
-    conversation.last_message_at = datetime.now(UTC)
-    session.flush()
-    session.refresh(message)
-    out = MessageOut.model_validate(message)  # build BEFORE commit
-    session.commit()
-    return out
 
 
 def get_timeline(
