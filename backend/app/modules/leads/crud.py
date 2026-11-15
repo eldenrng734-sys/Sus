@@ -10,6 +10,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.events import EventName, event_emitter
 from app.core.permissions import apply_data_scope
 from app.core.tenancy import TenantContext
 from app.modules.audit.service import record_audit_event
@@ -369,7 +370,6 @@ def create_lead(
         result = lead_out(lead)
         _store_create_response(session, idempotency_id, result)
         session.commit()
-        return result, False
     except IntegrityError as exc:
         session.rollback()
         constraint_name = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
@@ -383,6 +383,16 @@ def create_lead(
     except Exception:
         session.rollback()
         raise
+
+    event_emitter.publish(
+        EventName.LEAD_CREATED,
+        {
+            "tenant_id": ctx.tenant_id,
+            "lead_id": lead.id,
+            "occurred_at": lead.created_at,
+        },
+    )
+    return result, False
 
 
 def _split_multi(values: list[str] | None) -> list[str]:
