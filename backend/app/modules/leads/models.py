@@ -96,7 +96,16 @@ class Lead(UUIDPkMixin, TimestampMixin, Base):
             name="score_range",
         ),
         CheckConstraint("email IS NULL OR email = lower(email)", name="email_lowercase"),
-        CheckConstraint("email IS NOT NULL OR phone IS NOT NULL", name="contact_required"),
+        # Provider-native channels (Lead Ads / Messenger) may only have a
+        # provider-scoped ID. Every other source still needs a real contact.
+        CheckConstraint(
+            (
+                "email IS NOT NULL OR phone IS NOT NULL OR "
+                "(source IN ('facebook_lead_ads','messenger') "
+                "AND external_id IS NOT NULL AND btrim(external_id) <> '')"
+            ),
+            name="contact_required",
+        ),
         CheckConstraint(
             "NOT opted_out OR opted_out_at IS NOT NULL",
             name="opted_out_timestamp_required",
