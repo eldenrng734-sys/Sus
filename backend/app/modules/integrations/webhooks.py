@@ -9,6 +9,7 @@ import hmac
 import json
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, or_, select, text
@@ -16,6 +17,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.events import EventName, event_emitter
 from app.modules.auth.errors import AuthError
 from app.modules.integrations.models import Integration, WebhookEvent
 from app.modules.integrations.signature import verify_signature
@@ -214,6 +216,7 @@ def receive(
     stored = 0
     duplicates = 0
     integrations: dict[str, tuple[uuid.UUID, uuid.UUID]] = {}
+    pending_message_events: list[dict[str, object]] = []
 
     try:
         for event in events:
@@ -254,6 +257,20 @@ def receive(
                 duplicates += 1
             else:
                 stored += 1
+                message_data = event.data if provider == "whatsapp" else event.data.get("message")
+                if (
+                    event.event_type == "message"
+                    and isinstance(message_data, dict)
+                    and message_data
+                ):
+                    pending_message_events.append(
+                        {
+                            "tenant_id": tenant_id,
+                            "message_id": event.event_id,
+                            "provider": provider,
+                            "occurred_at": datetime.now(UTC),
+                        }
+                    )
 
         # Acknowledge only after the events are durable.
         session.commit()
@@ -261,6 +278,9 @@ def receive(
     except Exception:
         session.rollback()
         raise
+
+    for event_payload in pending_message_events:
+        event_emitter.publish(EventName.MESSAGE_RECEIVED, event_payload)
 
     return {
         "stored": stored,

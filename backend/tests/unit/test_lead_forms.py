@@ -1,6 +1,8 @@
 import json
 import uuid
+from datetime import UTC, datetime
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI
@@ -13,12 +15,13 @@ from app.modules.leads.capture import CaptureError
 
 
 class FakeSession:
-    def __init__(self, form) -> None:
+    def __init__(self, form, commit_error=None) -> None:
         self.form = form
         self.scalar_calls = 0
         self.execute_calls = []
         self.commit_calls = 0
         self.content_lengths = []
+        self.commit_error = commit_error
 
     def execute(self, statement, params=None):
         self.execute_calls.append((str(statement), params))
@@ -30,10 +33,12 @@ class FakeSession:
 
     def commit(self):
         self.commit_calls += 1
+        if self.commit_error:
+            raise self.commit_error
 
 
-def make_client(monkeypatch, form=None):
-    session = FakeSession(form)
+def make_client(monkeypatch, form=None, *, created=True, commit_error=None):
+    session = FakeSession(form, commit_error)
     app = FastAPI()
     app.include_router(router)
 
@@ -52,7 +57,14 @@ def make_client(monkeypatch, form=None):
         if not data.email and not data.phone:
             raise CaptureError("email or phone is required")
         captured.append((tenant_id, data))
-        return SimpleNamespace(lead=SimpleNamespace(id=uuid.uuid4()), created=True)
+        return SimpleNamespace(
+            lead=SimpleNamespace(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                created_at=datetime.now(UTC),
+            ),
+            created=created,
+        )
 
     monkeypatch.setattr(service, "capture_lead", capture_lead)
     return TestClient(app), session, captured
@@ -89,6 +101,13 @@ def submission(**overrides):
 
 def test_submission_returns_201_and_sanitizes_fields(monkeypatch):
     client, session, captured = make_client(monkeypatch, form())
+    published = []
+
+    def publish(name, payload):
+        assert session.commit_calls == 1
+        published.append((name, payload))
+
+    monkeypatch.setattr(service.event_emitter, "publish", publish)
 
     response = client.post(
         "/api/v1/public/forms/opaque-form-reference/submit",
@@ -113,10 +132,48 @@ def test_submission_returns_201_and_sanitizes_fields(monkeypatch):
     assert data.interaction_metadata["consent_version"] == "v1"
     assert data.interaction_metadata["utm"]["source"] == "newsletter"
     assert session.commit_calls == 1
+    assert len(published) == 1
+    event_name, event_payload = published[0]
+    assert event_name.value == "lead.created"
+    assert event_payload["tenant_id"] == tenant_id
+    assert event_payload["lead_id"] == uuid.UUID(payload["id"])
+    assert event_payload["occurred_at"].tzinfo is not None
     assert any(
         "set_config('app.public_form_id', '', true)" in statement
         for statement, _ in session.execute_calls
     )
+
+
+def test_duplicate_capture_does_not_publish_lead_created(monkeypatch):
+    client, _, _ = make_client(monkeypatch, form(), created=False)
+    publish = MagicMock()
+    monkeypatch.setattr(service.event_emitter, "publish", publish)
+
+    response = client.post(
+        "/api/v1/public/forms/opaque-form-reference/submit",
+        json=submission(),
+    )
+
+    assert response.status_code == 201
+    publish.assert_not_called()
+
+
+def test_failed_capture_commit_does_not_publish_lead_created(monkeypatch):
+    client, _, _ = make_client(
+        monkeypatch,
+        form(),
+        commit_error=RuntimeError("commit failed"),
+    )
+    publish = MagicMock()
+    monkeypatch.setattr(service.event_emitter, "publish", publish)
+
+    with pytest.raises(RuntimeError, match="commit failed"):
+        client.post(
+            "/api/v1/public/forms/opaque-form-reference/submit",
+            json=submission(),
+        )
+
+    publish.assert_not_called()
 
 
 def test_255_character_campaign_is_preserved_in_metadata_and_truncated_for_capture(
