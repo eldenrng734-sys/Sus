@@ -555,6 +555,8 @@ Route ordering: declare static paths before parameterized paths (`GET /tasks/due
 | GET | `/api/v1/conversations` | Tenant | Any (scoped) | List conversations |
 | GET | `/api/v1/conversations/{id}` | Tenant | Any (scoped) | Conversation detail |
 | GET | `/api/v1/conversations/{id}/messages` | Tenant | Any (scoped) | Message history |
+| POST | `/api/v1/conversations/{id}/analyze` | Tenant | Any (scoped) | Generate and store summary and sentiment |
+| GET | `/api/v1/conversations/{id}/analysis` | Tenant | Any (scoped) | Get latest summary and sentiment |
 | POST | `/api/v1/conversations/{id}/read` | Tenant | Any (scoped) | Mark conversation read |
 | POST | `/api/v1/messages` | Tenant | Any (scoped) | Send outbound message |
 | POST | `/api/v1/tasks` | Tenant | Any (scoped) | Create task |
@@ -1134,6 +1136,10 @@ Role scoping:
 
 `GET /api/v1/conversations/{id}/messages?cursor=&limit=50` returns messages newest first. `meta.next_cursor` loads older messages.
 
+`POST /api/v1/conversations/{id}/analyze` sends up to the latest 100 messages (bounded to 20,000 characters) to the configured OpenAI model after redacting known lead name/contact information, email addresses, and phone numbers. It validates and stores the summary, sentiment, model, prompt version, confidence, and review status in `lead_assessments`. Configure `OPENAI_API_KEY` and optionally `OPENAI_MODEL`; a missing key returns `503`, and provider/invalid-output errors return `502`.
+
+`GET /api/v1/conversations/{id}/analysis` returns the latest stored summary and sentiment for that conversation. Both routes use the caller's normal lead visibility scope.
+
 `POST /api/v1/conversations/{id}/read` marks unread messages as read and returns `204`. It is scoped to the caller.
 
 ### 9.2 `POST /api/v1/messages`
@@ -1518,22 +1524,31 @@ Required headers:
 | `X-Service-Id` | `n8n` (allow-listed) |
 | `X-Tenant-ID` | Tenant UUID; resource ownership is still verified |
 | `X-Timestamp` | Unix seconds; reject if skew > 300 seconds |
-| `X-Idempotency-Key` | Unique per logical action; stored 24 hours |
+| `X-Idempotency-Key` | 8–128 characters; unique per logical action; stored 24 hours |
 | `X-Signature` | `sha256=<hex>` |
 
-Canonical string:
+Version 1 canonical string:
 
 ```text
+v1
+SERVICE_ID
+TENANT_ID
 METHOD
 PATH
 TIMESTAMP
+IDEMPOTENCY_KEY
 SHA256(raw_body)
 ```
 
-- `PATH` is the request path **including the query string** exactly as sent, e.g. `/internal/v1/automation/tasks/due?limit=50`.
-- For an empty body, use `SHA256(b"")`.
-- The signature is `HMAC-SHA256(secret, canonical_string)`, hex-encoded, and sent as `X-Signature: sha256=<hex>`.
+- Use UTF-8 bytes for the canonical string with a single LF between fields and no trailing LF.
+- `SERVICE_ID` and `TENANT_ID` are the exact header values; service IDs are allow-listed and tenant IDs use canonical lowercase UUID syntax.
+- `METHOD` is uppercase. `PATH` is the raw request path, including the query string exactly as sent and percent-encoded where required.
+- `TIMESTAMP` is the exact decimal Unix-seconds header value. `IDEMPOTENCY_KEY` is the exact header value.
+- `SHA256(raw_body)` is the lowercase hexadecimal SHA-256 digest of the exact request-body bytes. Do not parse and re-serialize JSON before hashing or sending.
+- Reject CR or LF in header values used as canonical fields.
+- The signature is `HMAC-SHA256(secret, canonical_string)`, hex-encoded, and sent as `X-Signature: sha256=<64 lowercase hex characters>`.
 - Compare in constant time. Reject missing/invalid signatures with `401`.
+- Reject timestamps more than 300 seconds from server time.
 - Reject replayed idempotency keys with `409` unless the request body is identical, in which case replay the stored response.
 
 ### 14.2 Internal endpoints
@@ -1592,6 +1607,8 @@ Notify a rep:
 ```
 
 `202 Accepted`. Notification bodies must not contain credentials, tokens, or full message histories.
+
+For `POST /internal/v1/automation/notifications`, the raw request body is limited to 16 KiB. The only supported `type` is `new_lead` and the only supported `entity_type` is `lead`. `title` must be 1–200 characters and `body` 1–2000 characters after trimming whitespace; both must be non-empty. The recipient must be an active Rep in the authenticated tenant and must currently own the referenced lead. Tenant, recipient and lead are validated server-side under the authenticated tenant context. Unknown fields or unsupported types are rejected with `422`; oversized bodies return `413`; an inactive/non-Rep recipient or lead ownership mismatch returns `403`; a tenant or lead not found within the tenant returns `404`; same key with a different body returns `409`. Authentication failures return `401`; an unconfigured service secret returns `503`. Success is `202 Accepted` with no response body.
 
 ### 14.3 FastAPI → n8n event contract
 

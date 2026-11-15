@@ -1,4 +1,4 @@
-﻿"""Add restricted integration lookup for incoming webhooks."""
+"""Add restricted integration lookup for incoming webhooks."""
 
 from alembic import op
 from sqlalchemy import text

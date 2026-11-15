@@ -88,9 +88,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP POLICY IF EXISTS assignment_cursors_tenant_isolation ON assignment_cursors"
-    )
+    op.execute("DROP POLICY IF EXISTS assignment_cursors_tenant_isolation ON assignment_cursors")
     op.drop_table("assignment_cursors")
     op.drop_constraint(
         "ck_leads_opted_out_timestamp_required",

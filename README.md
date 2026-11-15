@@ -324,6 +324,12 @@ Example message: *"I need a CRM for my 20-person sales team. Please arrange a de
 
 **Flow:** get permitted history → redact unnecessary PII → structured prompt → validate with Pydantic → save with model + prompt version → deterministic rules decide tasks and approval.
 
+- The backend AI service redacts supplied lead identifiers plus email/phone patterns, builds a versioned prompt input, validates structured assessment output, and persists only redacted validated output with the model and prompt version.
+- Conversation analysis uses the OpenAI API to summarize recent messages and classify customer sentiment. Configure `OPENAI_API_KEY` and optionally `OPENAI_MODEL` in the deployment environment; message content is redacted before it is sent.
+- `POST /api/v1/conversations/{conversation_id}/analyze` generates and stores a conversation analysis; `GET /api/v1/conversations/{conversation_id}/analysis` returns its latest summary and sentiment.
+- Lead score is backend-computed (intent 0–35, buying stage 0–20, category 0–15, sentiment 0–15, confidence 0–15); model-supplied score/priority are ignored. Priority is high at 70+, medium at 40+, otherwise low; risk signals cap it at low and pending-review cases cap at medium.
+- Spam/unknown category, complaint/unknown intent, negative sentiment, confidence below 0.6, and fallback/failed results require human review. Actionable tasks are created idempotently only for the latest successful assessment after review is not required or explicitly approved, and only for open, opted-in leads. `follow_up_days` wins; otherwise action-specific defaults apply.
+- Conversation-only summary/sentiment results without category, intent, or buying-stage signals retain a null lead score/priority and do not overwrite existing lead values.
 - The LLM never modifies data, assigns permissions or sends messages directly.
 - Low confidence (e.g. < 0.6) → mark for human review.
 - Bangla and English are both supported and both included in the evaluation set.
@@ -349,6 +355,59 @@ n8n runs repeated jobs (reminders, due follow-ups). It **never touches the datab
 - **Licensing:** the Sustainable Use License can cover workflows we run for clients if they can't access or change them. Customer-configurable workflows or white-labeling may need a commercial license. Confirm with n8n before launch.
 
 Workflow exports live in `n8n/workflows/`.
+
+### Signing the rep notification request
+
+The backend accepts `POST /internal/v1/automation/notifications` only from the allow-listed `n8n` service. Keep the route on the private network. Configure the same high-entropy secret in the backend's `N8N_SERVICE_SECRET` environment variable and n8n's encrypted credentials; never include it in workflow exports, logs, or execution data.
+
+Required headers are `X-Service-Id: n8n`, `X-Tenant-ID` (canonical lowercase UUID), `X-Timestamp` (Unix seconds), `X-Idempotency-Key` (8–128 characters), and `X-Signature: sha256=<64 lowercase hex characters>`. The timestamp must be within 300 seconds of backend time. Raw request bodies are limited to 16 KiB.
+
+Serialize the JSON body once to UTF-8 bytes and send those exact bytes. Compute the lowercase hex SHA-256 digest over those bytes. Construct the UTF-8 canonical message with one LF between fields and no trailing LF:
+
+```text
+v1
+n8n
+<tenant-uuid>
+POST
+/internal/v1/automation/notifications
+<unix-seconds>
+<idempotency-key>
+<lowercase-sha256-of-raw-body>
+```
+
+Compute HMAC-SHA256 over the canonical message with the service secret and lowercase-hex encode the digest after the `sha256=` prefix. Reuse the same idempotency key and byte-identical body for retries during the 24-hour validity window. Generate and persist a new key for each new logical notification.
+
+Language-neutral pseudocode:
+
+```text
+body_bytes = UTF8(serialize_json_once(request_object))
+timestamp = decimal_unix_seconds()
+key = persistent_key_for_this_logical_notification()
+body_digest = lowercase_hex(SHA256(body_bytes))
+canonical = JOIN_WITH_LF_NO_TRAILING_LF(
+    "v1", "n8n", tenant_uuid, "POST",
+    "/internal/v1/automation/notifications",
+    timestamp, key, body_digest
+)
+signature = "sha256=" + lowercase_hex(HMAC_SHA256(secret_bytes, UTF8(canonical)))
+send_exact_bytes_and_headers(body_bytes, timestamp, key, signature)
+```
+
+Example request (all values are placeholders):
+
+```http
+POST /internal/v1/automation/notifications
+X-Service-Id: n8n
+X-Tenant-ID: <tenant-uuid>
+X-Timestamp: <unix-seconds>
+X-Idempotency-Key: <stable-logical-action-key>
+X-Signature: sha256=<64-lowercase-hex-characters>
+Content-Type: application/json
+
+{"user_id":"<rep-uuid>","type":"new_lead","title":"New lead","body":"A new lead is assigned to you.","entity_type":"lead","entity_id":"<lead-uuid>"}
+```
+
+No n8n workflow or signing script is present in this repository. This guide documents the backend contract; the external n8n workflow still needs to be configured and tested against it.
 
 ---
 

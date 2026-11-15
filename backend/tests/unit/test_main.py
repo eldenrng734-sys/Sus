@@ -17,6 +17,8 @@ def test_auth_routers_and_day4_lead_routes_are_registered():
     assert "/api/v1/auth/login" in paths
     assert "/api/v1/auth/password-reset" in paths
     assert "/api/v1/conversations" in paths
+    assert "/api/v1/conversations/{conversation_id}/analyze" in paths
+    assert "/api/v1/conversations/{conversation_id}/analysis" in paths
     assert "/api/v1/leads" in paths
     assert "/api/v1/leads/{lead_id}" in paths
     assert "/api/v1/leads/{lead_id}/assign" in paths

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     mfa_encryption_key: str = ""
     mfa_issuer: str = "AI Sales Assistant CRM"
+    openai_api_key: SecretStr | None = None
+    openai_model: str = "gpt-4o-mini"
+    openai_timeout_seconds: float = Field(default=30, gt=0, le=120)
 
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
@@ -58,6 +61,7 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
     llm_input_price_per_mtok: float = 0.0
     llm_output_price_per_mtok: float = 0.0
+    ai_review_confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[3] / ".env",

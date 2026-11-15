@@ -91,12 +91,8 @@ def upgrade() -> None:
         "leads",
         sa.Column("version", sa.Integer(), server_default=sa.text("1"), nullable=False),
     )
-    op.create_index(
-        "ix_leads_tenant_team", "leads", ["tenant_id", "team_id"], unique=False
-    )
-    op.create_index(
-        "ix_leads_tenant_priority", "leads", ["tenant_id", "priority"], unique=False
-    )
+    op.create_index("ix_leads_tenant_team", "leads", ["tenant_id", "team_id"], unique=False)
+    op.create_index("ix_leads_tenant_priority", "leads", ["tenant_id", "priority"], unique=False)
     op.add_column("leads", sa.Column("consent_at", sa.DateTime(timezone=True), nullable=True))
     op.add_column("leads", sa.Column("consent_source", sa.String(length=20), nullable=True))
     op.add_column("leads", sa.Column("opted_out_at", sa.DateTime(timezone=True), nullable=True))
