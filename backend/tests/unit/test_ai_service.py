@@ -50,10 +50,15 @@ def test_build_assessment_prompt_redacts_message_and_records_prompt_version():
     )
 
     assert prompt["prompt_version"] == PROMPT_VERSION
+    assert PROMPT_VERSION == "lead-assessment-v3"
     assert "Ayesha" not in prompt["user"]
     assert "ayesha@example.com" not in prompt["user"]
     assert "415-555-0199" not in prompt["user"]
     assert "untrusted data" in prompt["system"]
+    for field in AssessmentOutput.model_fields:
+        assert field in prompt["system"]
+    assert "Bangla" in prompt["system"]
+    assert "not a statistically calibrated probability" in prompt["system"]
 
 
 def test_persist_assessment_stores_versions_and_only_redacted_output():
@@ -109,6 +114,30 @@ def test_persist_assessment_marks_provider_failure_for_review():
     assert assessment.needs_human_review is True
     assert assessment.review_status == "pending"
     assert assessment.status == "failed"
+
+
+def test_persist_assessment_marks_missing_confidence_for_review():
+    session = MagicMock()
+    session.scalar.return_value = datetime.now(UTC)
+
+    assessment = persist_assessment(
+        session,
+        tenant_id=uuid.uuid4(),
+        lead_id=uuid.uuid4(),
+        conversation_id=None,
+        output={
+            "intent": "info",
+            "sentiment": "neutral",
+            "summary": "Customer asked for information.",
+        },
+        model="provider/model-v1",
+        prompt_version=PROMPT_VERSION,
+        pii_values=[],
+    )
+
+    assert assessment.confidence is None
+    assert assessment.needs_human_review is True
+    assert assessment.review_status == "pending"
 
 
 @pytest.mark.parametrize(

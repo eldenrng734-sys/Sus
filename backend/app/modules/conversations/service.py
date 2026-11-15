@@ -189,6 +189,18 @@ def analyze_conversation(
             timeout_seconds=settings.openai_timeout_seconds,
         )
     except AIProviderError:
+        persist_assessment(
+            session,
+            tenant_id=context.tenant_id,
+            lead_id=lead_id,
+            conversation_id=scoped_conversation_id,
+            output={},
+            model=model,
+            prompt_version=prompt["prompt_version"],
+            pii_values=pii_values,
+            status="failed",
+        )
+        session.commit()
         raise AuthError(502, "provider_error", "AI conversation analysis failed") from None
 
     assessment = persist_assessment(
