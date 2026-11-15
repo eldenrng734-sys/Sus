@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
 
 from app.modules.ai.llm_client import LLMClient, LLMError, get_llm_client
 from app.modules.ai.prompts import (
@@ -13,16 +13,17 @@ from app.modules.ai.prompts import (
     CLASSIFY_SYSTEM_PROMPT,
     build_user_prompt,
 )
+from app.modules.ai.rules import requires_human_review
 
 logger = logging.getLogger("app.ai")
 
-REVIEW_CONFIDENCE_THRESHOLD = 0.6  # below this a human must look (ARCHITECTURE.md section 8)
 MAX_MESSAGE_CHARS = 4_000
 
 # These values must match the CHECK constraints on lead_assessments.
 Category = Literal["business_customer", "individual", "partner", "spam", "unknown"]
 Intent = Literal["request_demo", "pricing", "support", "info", "complaint", "other", "unknown"]
 BuyingStage = Literal["awareness", "consideration", "decision", "unknown"]
+Sentiment = Literal["positive", "neutral", "negative"]
 Action = Literal["call", "schedule_demo", "email", "follow_up", "support", "none"]
 Status = Literal["ok", "fallback", "failed"]
 
@@ -36,9 +37,10 @@ class ClassificationOutput(BaseModel):
     intent: Intent
     interest: str | None = Field(default=None, max_length=200)
     buying_stage: BuyingStage
+    sentiment: Sentiment | None = None
     recommended_action: Action
     follow_up_days: int = Field(ge=0, le=365)
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: FiniteFloat = Field(ge=0.0, le=1.0)
 
 
 @dataclass(frozen=True)
@@ -60,6 +62,7 @@ def _fallback(status: Status, error_code: str, model: str | None) -> Classificat
             intent="unknown",
             interest=None,
             buying_stage="unknown",
+            sentiment=None,
             recommended_action="none",
             follow_up_days=0,
             confidence=0.0,
@@ -106,7 +109,7 @@ def classify_message(text: str, *, client: LLMClient | None = None) -> Classific
     return ClassificationOutcome(
         status="ok",
         output=output,
-        needs_human_review=output.confidence < REVIEW_CONFIDENCE_THRESHOLD,
+        needs_human_review=requires_human_review(output, "ok"),
         model=result.model,
         prompt_version=CLASSIFY_PROMPT_VERSION,
     )

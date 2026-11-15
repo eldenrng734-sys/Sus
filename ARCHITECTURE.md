@@ -342,7 +342,7 @@ Committed outbox event → backend dispatcher → signed n8n webhook
 - n8n requests message sending through the backend; it never receives messaging-provider credentials. WhatsApp sends must respect the 24-hour window and approved templates where required.
 - Exports belong in `n8n/workflows/` without embedded credentials; minimize and expire execution data containing tenant content.
 
-**Security design gap:** the current target HMAC canonical string signs method, path/query, timestamp and body hash, but not `X-Tenant-ID`, service ID or idempotency headers. Those headers must not be described as cryptographically bound today. Before implementation, security review must choose a tenant-bound credential/scope model and/or a versioned signature covering security-relevant headers, with synchronized API contract and tests. A shared service key plus arbitrary tenant selection is not sufficient isolation.
+The rep-notification endpoint uses a versioned HMAC request signature covering service ID, tenant ID, method, raw path/query, timestamp, idempotency key and the raw-body digest. This closes the tenant-selection signing gap for that endpoint only; other internal endpoints are not implemented here and must use the same tenant-bound authentication contract before exposure. A shared service key with an unsigned tenant selector is not sufficient isolation.
 
 Scheduled workflows also need an approved tenant-dispatch mechanism; do not add an unrestricted “list all tenants/leads” route to make scheduling convenient.
 

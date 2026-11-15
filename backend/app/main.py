@@ -14,6 +14,7 @@ from app.modules.conversations.router import router as conversations_router
 from app.modules.integrations.webhook_router import router as webhook_router
 from app.modules.lead_forms.router import router as lead_forms_router
 from app.modules.leads.router import router as leads_router
+from app.modules.notifications.router import router as notifications_router
 from app.modules.teams.router import router as teams_router
 
 logging.basicConfig(level=logging.INFO)
@@ -95,6 +96,7 @@ app.include_router(assessments_router)
 app.include_router(conversations_router)
 app.include_router(lead_forms_router)
 app.include_router(leads_router)
+app.include_router(notifications_router)
 app.include_router(teams_router)
 app.include_router(webhook_router)
 

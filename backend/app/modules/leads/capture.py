@@ -119,8 +119,6 @@ def capture_lead(
     db.flush()
     db.refresh(lead)  # load server defaults (status, priority, version)
 
-    if created:
-        emit_lead_created(db, lead, actor_user_id)
     return CaptureResult(lead=lead, created=created, matched_on=matched_on, conflicts=conflicts)
 
 
