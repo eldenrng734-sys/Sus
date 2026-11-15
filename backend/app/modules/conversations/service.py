@@ -1,5 +1,4 @@
 import uuid
-from datetime import UTC, datetime
 
 from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
@@ -12,15 +11,10 @@ from app.modules.conversations.models import Conversation, Message
 from app.modules.conversations.schemas import (
     ConversationCreate,
     ConversationOut,
-    MessageCreate,
     MessageOut,
     TimelineEvent,
 )
 from app.modules.leads.models import Interaction, Lead
-from app.modules.leads.optout import can_message
-
-# messages.provider only allows these two (see the DB check constraint)
-MESSAGE_CHANNELS = ("whatsapp", "messenger")
 
 
 def _get_lead(session: Session, context: TenantContext, lead_id: uuid.UUID) -> Lead:
@@ -130,37 +124,6 @@ def list_messages(
         .offset(offset)
     )
     return [MessageOut.model_validate(m) for m in session.scalars(stmt)]
-
-
-def send_message(session: Session, context: TenantContext, body: MessageCreate) -> MessageOut:
-    """Store an outbound message as 'queued'. Real sending is added on Day 7."""
-    conversation = _get_conversation(session, context, body.conversation_id)
-    if conversation.channel not in MESSAGE_CHANNELS:
-        raise AuthError(
-            422, "validation_error", "Messages are only supported on WhatsApp and Messenger"
-        )
-    lead = _get_lead(session, context, conversation.lead_id)
-    allowed, reason = can_message(lead)
-    if not allowed:
-        if reason == "opt_out":
-            raise AuthError(403, "opt_out", "This lead has opted out of messages")
-        raise AuthError(403, "no_consent", "This lead has not consented to messages")
-
-    message = Message(
-        tenant_id=context.tenant_id,
-        conversation_id=conversation.id,
-        provider=conversation.channel,
-        direction="outbound",
-        message_text=body.message_text,
-        status="queued",
-    )
-    session.add(message)
-    conversation.last_message_at = datetime.now(UTC)
-    session.flush()
-    session.refresh(message)
-    out = MessageOut.model_validate(message)  # build BEFORE commit
-    session.commit()
-    return out
 
 
 def get_timeline(

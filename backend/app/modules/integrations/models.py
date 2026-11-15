@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     CheckConstraint,
@@ -14,6 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
     text,
+    update,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID, insert
 from sqlalchemy.orm import Mapped, Session, mapped_column
@@ -185,4 +186,51 @@ def record_event(
         .returning(WebhookEvent.id)
     )
     return session.execute(stmt).scalar_one_or_none()
+
+
+MAX_EVENT_ERROR_LENGTH = 500
+
+
+def mark_webhook_event_processing(webhook_event_id: uuid.UUID, session: Session) -> None:
+    """Mark a receipt as queued for post-commit processing (no commit)."""
+    session.execute(
+        update(WebhookEvent)
+        .where(WebhookEvent.id == webhook_event_id)
+        .values(status="processing")
+    )
+
+
+def mark_webhook_event_processed(webhook_event_id: uuid.UUID, session: Session) -> None:
+    """Mark a receipt as fully handled (no commit)."""
+    session.execute(
+        update(WebhookEvent)
+        .where(WebhookEvent.id == webhook_event_id)
+        .values(
+            status="processed",
+            processed_at=datetime.now(UTC),
+            error=None,
+        )
+    )
+
+
+def mark_webhook_event_failed(
+    webhook_event_id: uuid.UUID,
+    error: str,
+    session: Session,
+) -> None:
+    """Record a safe failure label and bump the attempt counter (no commit).
+
+    Callers must pass a short, non-PII error label — never a raw provider
+    response, request URL, or message body.
+    """
+    session.execute(
+        update(WebhookEvent)
+        .where(WebhookEvent.id == webhook_event_id)
+        .values(
+            status="failed",
+            attempts=WebhookEvent.attempts + 1,
+            error=(error or "processing_failed")[:MAX_EVENT_ERROR_LENGTH],
+            processed_at=datetime.now(UTC),
+        )
+    )
 

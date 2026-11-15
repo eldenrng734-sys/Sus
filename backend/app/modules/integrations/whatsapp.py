@@ -18,25 +18,18 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select, text
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.modules.auth.errors import AuthError
-from app.modules.conversations.models import Conversation, Message
-from app.modules.integrations.protocols import ParsedEvent
+from app.modules.conversations.models import Message
+from app.modules.integrations.inbound import InboundMessage, store_inbound_message
+from app.modules.integrations.protocols import AfterCommitJob, ParsedEvent
 from app.modules.integrations.registry import register_provider
 from app.modules.integrations.signature import verify_signature
-from app.modules.leads.capture import CaptureInput, capture_lead
 from app.modules.leads.capture_normalize import clean_name, normalize_phone
-from app.modules.leads.optout import apply_opt_out, is_opt_out_message
 
 logger = logging.getLogger(__name__)
-
-
-def emit(event_name: str, payload: dict[str, Any]) -> None:
-    """No-op event emitter. Dev 2 builds the real emitter on Day 10."""
-    logger.debug("emit_hook event=%s payload=%s", event_name, payload)
 
 
 class WhatsAppProvider:
@@ -174,7 +167,8 @@ class WhatsAppProvider:
         session: Session,
         tenant_id: uuid.UUID,
         integration_id: uuid.UUID,
-    ) -> None:
+        webhook_event_id: uuid.UUID,
+    ) -> list[AfterCommitJob] | None:
         """Process a deduplicated WhatsApp inbound event."""
         # Set tenant context on DB session for RLS
         session.execute(
@@ -209,16 +203,18 @@ class WhatsAppProvider:
                     elif new_status == "read":
                         db_msg.read_at = now
                     elif new_status == "failed":
-                        db_msg.error_code = status_data.get("errors", [{}])[0].get("title", "failed")
-            return
+                        errors = status_data.get("errors") or [{}]
+                        first_error = errors[0] if isinstance(errors[0], dict) else {}
+                        db_msg.error_code = first_error.get("title", "failed")
+            return None
 
         if event.event_type != "message":
-            return
+            return None
 
         msg = event.data.get("message", {})
         sender_raw = str(msg.get("from") or "")
         if not sender_raw:
-            return
+            return None
 
         # 1. Normalize sender's number to E.164 (+8801...)
         try:
@@ -234,56 +230,11 @@ class WhatsAppProvider:
         except Exception:
             contact_name = phone_e164 or "WhatsApp Lead"
 
-        # 2. Call Day 6 capture service (source="whatsapp", external_id=phone_e164)
-        capture_input = CaptureInput(
-            name=contact_name,
-            phone=phone_e164,
-            source="whatsapp",
-            external_id=phone_e164,
-            consent=True,
-            consent_source="whatsapp",
-        )
-        capture_result = capture_lead(
-            session,
-            tenant_id=tenant_id,
-            data=capture_input,
-        )
-        lead = capture_result.lead
-
-        # 3. Find or create the conversation
-        now = datetime.now(UTC)
-        conv = session.execute(
-            select(Conversation).where(
-                Conversation.tenant_id == tenant_id,
-                Conversation.channel == "whatsapp",
-                Conversation.lead_id == lead.id,
-            ).limit(1)
-        ).scalar_one_or_none()
-
-        if conv is None:
-            conv = Conversation(
-                tenant_id=tenant_id,
-                lead_id=lead.id,
-                channel="whatsapp",
-                external_contact_id=phone_e164,
-                external_conversation_id=phone_e164,
-                status="open",
-                assigned_user_id=lead.assigned_user_id,
-                last_inbound_at=now,
-                last_message_at=now,
-            )
-            session.add(conv)
-            session.flush()
-        else:
-            conv.last_inbound_at = now
-            conv.last_message_at = now
-            if not conv.external_contact_id:
-                conv.external_contact_id = phone_e164
-
-        # 4. Extract message text and attachment reference
+        # 2. Extract message text and attachment reference
         msg_type = msg.get("type", "text")
         if msg_type == "text":
-            body_text = msg.get("text", {}).get("body", "")
+            text_payload = msg.get("text")
+            body_text = text_payload.get("body", "") if isinstance(text_payload, dict) else ""
             attachment_ref = None
         else:
             body_text = f"[{msg_type}]"
@@ -292,44 +243,28 @@ class WhatsAppProvider:
                 attachment_data.get("id") if isinstance(attachment_data, dict) else None
             )
 
-        # 5. Insert inbound message
-        inbound_message = Message(
+        # 3. Single shared pipeline: capture -> conversation -> message -> opt-out
+        store_inbound_message(
+            session,
             tenant_id=tenant_id,
-            conversation_id=conv.id,
-            provider="whatsapp",
-            provider_message_id=event.event_id,
-            direction="inbound",
-            message_text=body_text,
-            attachment_reference=attachment_ref,
-            status="received",
+            inbound=InboundMessage(
+                provider="whatsapp",
+                channel="whatsapp",
+                source="whatsapp",
+                account_id=event.account_id,
+                external_contact_id=phone_e164,
+                external_conversation_id=phone_e164,
+                external_lead_id=phone_e164,
+                contact_name=contact_name,
+                message_id=event.event_id,
+                body_text=body_text,
+                attachment_reference=attachment_ref,
+                phone=phone_e164,
+                consent=True,
+                consent_source="whatsapp",
+            ),
         )
-        session.add(inbound_message)
-        try:
-            session.flush()
-        except IntegrityError:
-            # Second line of defense: duplicate provider_message_id is ignored
-            session.rollback()
-            logger.info(
-                "whatsapp_duplicate_message wamid=%s tenant=%s ignored",
-                event.event_id,
-                tenant_id,
-            )
-            return
-
-        # 6. Check opt-out stop keywords (including Bangla: 'বন্ধ', 'বন্ধ করুন')
-        if body_text and is_opt_out_message(body_text):
-            apply_opt_out(session, lead.id, source="whatsapp")
-
-        # 7. Emit no-op message.received hook
-        emit(
-            "message.received",
-            {
-                "tenant_id": str(tenant_id),
-                "conversation_id": str(conv.id),
-                "message_id": str(inbound_message.id),
-                "lead_id": str(lead.id),
-            },
-        )
+        return None
 
 
 # Register default WhatsApp provider instance

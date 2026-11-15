@@ -215,6 +215,57 @@ def test_cross_tenant_isolation_and_conflict(api_client, seed, tokens):
     assert r_b_conflict.json()["error"]["code"] == "account_already_registered"
 
 
+def test_meta_connect_subscribes_page_to_leadgen_and_messages(
+    api_client, seed, tokens, mock_meta_graph
+):
+    page_id = str(uuid.uuid4().int)[:15]
+    headers = _headers(tokens, seed, "a", "admin")
+    route = mock_meta_graph.post(
+        path__regex=rf"^/v\d+\.\d+/{page_id}/subscribed_apps$"
+    ).respond(200, json={"success": True})
+
+    resp = api_client.post(
+        "/api/v1/integrations/meta/connect",
+        json={
+            "provider_account_id": page_id,
+            "access_token": "page-token-meta",
+            "scopes": ["leads_retrieval", "ads_management", "pages_manage_metadata"],
+        },
+        headers=headers,
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["provider"] == "meta"
+    assert "page-token-meta" not in resp.text
+
+    validation_call = next(
+        call for call in mock_meta_graph.calls if call.request.method == "GET"
+    )
+    assert validation_call.request.headers["authorization"] == "Bearer page-token-meta"
+    assert "access_token" not in str(validation_call.request.url)
+
+    assert route.call_count == 1
+    request = route.calls[0].request
+    assert request.headers["authorization"] == "Bearer page-token-meta"
+    assert request.headers["content-type"].startswith("application/x-www-form-urlencoded")
+    assert request.url.params.get("subscribed_fields") is None
+    assert request.content == b"subscribed_fields=leadgen%2Cmessages%2Cmessaging_postbacks"
+    assert "access_token" not in str(request.url)
+
+
+def test_meta_connect_rejects_non_numeric_page_id(api_client, seed, tokens):
+    headers = _headers(tokens, seed, "a", "admin")
+
+    resp = api_client.post(
+        "/api/v1/integrations/meta/connect",
+        json={"provider_account_id": "../me", "access_token": "page-token-meta"},
+        headers=headers,
+    )
+
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "validation_error"
+
+
 def test_invalid_token_rejected_on_connect(api_client, seed, tokens, mock_meta_graph):
     account_id = "wa-invalid-" + uuid.uuid4().hex[:10]
     headers = _headers(tokens, seed, "a", "admin")

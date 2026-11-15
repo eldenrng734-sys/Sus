@@ -19,10 +19,16 @@ contain its own HMAC code.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from sqlalchemy.orm import Session
+
+#: Work that must only start after the webhook transaction has committed.
+#: The dispatcher hands these to FastAPI BackgroundTasks, so providers never
+#: start network work while the webhook receipt is still uncommitted.
+AfterCommitJob = Callable[[], Awaitable[None]]
 
 
 @dataclass(frozen=True)
@@ -117,7 +123,8 @@ class WebhookProvider(Protocol):
         session: Session,
         tenant_id: uuid.UUID,
         integration_id: uuid.UUID,
-    ) -> None:
+        webhook_event_id: uuid.UUID,
+    ) -> list[AfterCommitJob] | None:
         """Process one new, deduplicated event.
 
         Called by the dispatcher only after:
@@ -134,10 +141,18 @@ class WebhookProvider(Protocol):
           - Run opt-out handling if the text is a stop keyword.
           - Emit no-op hook ("message.received").
 
+        Return a list of ``AfterCommitJob`` callables when work must not block
+        the provider's HTTP request (for example, Meta Lead Ads detail fetch).
+        The dispatcher marks the receipt ``processing`` and schedules the jobs
+        only after its transaction commits. Each job is responsible for moving
+        the receipt to ``processed`` or ``failed``.
+
         Rules:
           - Do NOT commit or rollback the session; the dispatcher owns the
             transaction.
           - Do NOT re-resolve the tenant; use the tenant_id argument.
+          - Do NOT start background work before returning; the receipt is not
+            durable yet.
           - Treat a unique-constraint violation on provider_message_id as a
             duplicate and return silently (second line of defence).
           - For "status" event_type, log and return without further action.

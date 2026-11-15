@@ -2,8 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Query, Request
-from fastapi.concurrency import run_in_threadpool
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
@@ -35,6 +34,7 @@ def verify_webhook(
 async def receive_webhook(
     provider: str,
     request: Request,
+    background: BackgroundTasks,
     x_hub_signature_256: Annotated[str | None, Header()] = None,
     session: Session = Depends(get_session),
 ) -> dict:
@@ -65,6 +65,7 @@ async def receive_webhook(
         provider,
         raw_body,
         x_hub_signature_256,
+        background=background,
     )
 
     return {

@@ -8,7 +8,8 @@ from app.core.config import settings
 from app.core.permissions import require_admin
 from app.core.tenancy import TenantContext
 from app.database.session import get_session
-from app.modules.integrations import service
+from app.modules.auth.errors import AuthError
+from app.modules.integrations import meta, service
 from app.modules.integrations.schemas import (
     ConnectIntegrationRequest,
     ConnectIntegrationResponse,
@@ -29,7 +30,15 @@ async def connect(
     context: Annotated[TenantContext, Depends(require_admin)],
     session: Session = Depends(get_session),
 ) -> dict:
-    """Connect an integration. Write-only credentials; never logged or returned."""
+    """Connect an integration. Write-only credentials; never logged or returned.
+
+    Meta additionally subscribes the app to the Page's ``leadgen``, ``messages``
+    and ``messaging_postbacks`` fields. Required Meta permissions:
+    ``leads_retrieval``, ``ads_management``, ``pages_manage_metadata``.
+    """
+    if provider == "meta" and not body.provider_account_id.isdigit():
+        raise AuthError(400, "validation_error", "Meta page id must be numeric")
+
     # Cheap Graph API validation call on connect (unless explicitly in unit test bypass)
     if settings.app_env != "test":
         await service.validate_meta_token(
@@ -47,6 +56,15 @@ async def connect(
         waba_id=body.waba_id,
         scopes=body.scopes,
     )
+
+    if provider == "meta":
+        # Credentials are stored first: a temporary Graph failure must not lose
+        # the token the admin just supplied. Re-running connect retries the
+        # idempotent subscription.
+        await meta.subscribe_page(
+            body.provider_account_id,
+            body.access_token,
+        )
 
     resp = ConnectIntegrationResponse(
         connected=True,

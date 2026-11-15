@@ -8,7 +8,7 @@ from app.core.permissions import require_any_member
 from app.core.tenancy import TenantContext
 from app.database.session import get_session
 from app.modules.conversations import service
-from app.modules.conversations.schemas import ConversationCreate, MessageCreate
+from app.modules.conversations.schemas import ConversationCreate
 
 router = APIRouter(prefix="/api/v1", tags=["conversations"])
 
@@ -45,15 +45,6 @@ def list_messages(
 ) -> dict:
     data = service.list_messages(session, context, conversation_id, limit, offset)
     return {"data": data, "meta": {"limit": limit, "offset": offset}}
-
-
-@router.post("/messages", status_code=201)
-def send_message(
-    body: MessageCreate,
-    context: TenantContext = Depends(require_any_member),
-    session: Session = Depends(get_session),
-) -> dict:
-    return {"data": service.send_message(session, context, body)}
 
 
 @router.get("/leads/{lead_id}/timeline")

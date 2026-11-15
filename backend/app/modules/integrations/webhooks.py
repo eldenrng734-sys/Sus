@@ -22,13 +22,20 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
+from fastapi import BackgroundTasks
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.modules.auth.errors import AuthError
+from app.modules.integrations import meta as _meta_init  # noqa: F401
 from app.modules.integrations import whatsapp as _wa_init  # noqa: F401
-from app.modules.integrations.models import record_event
+from app.modules.integrations.models import (
+    mark_webhook_event_processed,
+    mark_webhook_event_processing,
+    record_event,
+)
+from app.modules.integrations.protocols import AfterCommitJob
 from app.modules.integrations.registry import get_provider
 from app.modules.integrations.signature import verify_signature
 
@@ -179,6 +186,7 @@ async def receive(
     provider: str,
     raw_body: bytes,
     signature_header: str | None,
+    background: BackgroundTasks | None = None,
 ) -> dict:
     if provider not in PROVIDERS:
         raise AuthError(404, "not_found", "Unknown provider")
@@ -229,6 +237,7 @@ async def receive(
     stored = 0
     duplicates = 0
     skipped = 0
+    deferred: list[AfterCommitJob] = []
     # Cache per-request to avoid one DB round-trip per event from the same account.
     resolved: dict[str, tuple[UUID, UUID] | None] = {}
 
@@ -267,15 +276,28 @@ async def receive(
 
             if new_id is None:
                 duplicates += 1
+                continue
+
+            stored += 1
+            if provider_impl is None:
+                mark_webhook_event_processed(new_id, session)
+                continue
+
+            jobs = await provider_impl.handle(
+                event,
+                session,
+                tenant_id,
+                integration_id,
+                new_id,
+            )
+
+            if jobs:
+                # Do not process before the receipt is durable. The job is
+                # scheduled only after the commit below.
+                deferred.extend(jobs)
+                mark_webhook_event_processing(new_id, session)
             else:
-                stored += 1
-                if provider_impl is not None:
-                    await provider_impl.handle(
-                        event,
-                        session,
-                        tenant_id,
-                        integration_id,
-                    )
+                mark_webhook_event_processed(new_id, session)
 
         # Acknowledge only after all events are durable.
         session.commit()
@@ -283,6 +305,15 @@ async def receive(
     except Exception:
         session.rollback()
         raise
+
+    # The transaction is committed: it is now safe to start provider I/O.
+    # Tests and direct callers without BackgroundTasks run the jobs inline so
+    # the receipt never stays stuck in "processing".
+    for job in deferred:
+        if background is not None:
+            background.add_task(job)
+        else:
+            await job()
 
     return {
         "stored": stored,

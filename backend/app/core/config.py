@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     webhook_verify_token: SecretStr = SecretStr("")
     # Graph API version — set in env, never hardcoded in business logic.
     meta_graph_version: str = "v21.0"
+    meta_graph_timeout_seconds: float = 10.0
+    # Total provider attempts for retryable failures (429/5xx/network), not retries after the first.
+    meta_send_max_attempts: int = 3
+    meta_send_backoff_seconds: float = 0.25
 
     # AES-256-GCM key for encrypting per-tenant credentials in the DB.
     # Must be a base64-encoded 32-byte value.  Generate with:

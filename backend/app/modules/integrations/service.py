@@ -42,11 +42,14 @@ async def validate_meta_token(
     # Allow passing an existing client or using a temporary one
     should_close = False
     if client is None:
-        client = httpx.AsyncClient(timeout=10.0)
+        client = httpx.AsyncClient(timeout=settings.meta_graph_timeout_seconds)
         should_close = True
 
     try:
-        resp = await client.get(url, params={"access_token": access_token})
+        resp = await client.get(
+            url,
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
         if resp.status_code >= 400:
             logger.warning(
                 "integration.token_validation_failed provider=%s account_id=%s status=%d",
@@ -224,19 +227,27 @@ def get_credentials(
     tenant_id: uuid.UUID,
     provider: str,
     session: Session,
+    *,
+    integration_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """Retrieve decrypted credentials for an active integration.
+
+    Pass ``integration_id`` when the caller already resolved the exact account
+    (for example a webhook for one of several Meta Pages). Without it, the
+    oldest matching active integration is used for backwards compatibility.
 
     Falls back to test environment configuration if no database integration
     is configured (development/test stubbing).
     """
-    row = session.execute(
-        select(Integration).where(
-            Integration.tenant_id == tenant_id,
-            Integration.provider == provider,
-            Integration.status == "active",
-        ).limit(1)
-    ).scalar_one_or_none()
+    statement = select(Integration).where(
+        Integration.tenant_id == tenant_id,
+        Integration.provider == provider,
+        Integration.status == "active",
+    )
+    if integration_id is not None:
+        statement = statement.where(Integration.id == integration_id)
+
+    row = session.execute(statement.order_by(Integration.created_at).limit(1)).scalar_one_or_none()
 
     if row is not None and row.credentials_encrypted:
         return decrypt_credentials(
