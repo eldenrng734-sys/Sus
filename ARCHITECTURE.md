@@ -54,7 +54,7 @@ Business journey: capture a lead → preserve one CRM history → assess intent 
 | Security | Some model CHECK, unique and composite-FK constraints | No implemented authentication, RBAC, RLS policies, tenant resolver, MFA or encrypted integration storage |
 | Infrastructure | Development Compose declares PostgreSQL 16 and a backend; Dockerfile uses Python 3.12 | No frontend, worker, n8n or reverse-proxy service is configured |
 | Tests and CI | One health API test; CI declares Ruff lint, Ruff format check and pytest on Python 3.12 | No database, cross-tenant, provider, AI, workflow or browser test coverage yet |
-| Other components | Empty frontend, n8n workflow and reverse-proxy directories | No UI application, workflow exports or TLS routing implementation |
+| Other components | n8n workflow directory; Caddy routing config | No workflow exports or production proxy service/deployment configuration |
 
 **MVP scope:** onboarding, tenant isolation, CRM core, website/manual/CSV/WhatsApp capture, advisory AI, follow-ups and role dashboards. Meta Lead Ads/Messenger is test-mode, lower-priority scope. Tracking is optional/cuttable; Instagram, forums, billing, external CRM sync and autonomous AI are not MVP requirements.
 
@@ -392,6 +392,8 @@ Internet :443 → TLS reverse proxy → frontend / public backend routes
 Private network: backend API + worker + PostgreSQL + n8n
                  /internal/* reachable only by approved internal clients
 ```
+
+[`infrastructure/Caddyfile`](./infrastructure/Caddyfile) defines the production proxy policy: Caddy-managed HTTPS for `DOMAIN`, `/api/v1/*` routed to `backend:8000`, all other requests routed to `frontend:3000`, `/internal/*` denied, and baseline security headers. The production Compose configuration must mount this file, provide `DOMAIN`, persist Caddy's `/data` and `/config`, publish ports 80/443, and keep the frontend/backend upstreams on a private network. The CSP allows inline scripts and styles for the current Next.js app; tighten it with a nonce-based policy before treating it as a strict CSP.
 
 1. Add an explicit production configuration: no source mounts or reload, non-root processes, resource limits and reproducible dependency/container versions.
 2. Only the TLS proxy publishes customer-facing ports. Remove DB/backend/n8n host publishing; deny internal paths at the proxy and restrict private-network reachability.

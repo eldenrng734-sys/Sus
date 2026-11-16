@@ -1,0 +1,23 @@
+{$DOMAIN} {
+	encode zstd gzip
+
+	log {
+		output stdout
+		format json
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https:"
+	}
+
+	@internal path /internal /internal/*
+	respond @internal 404
+
+	@api path /api/v1 /api/v1/*
+	reverse_proxy @api backend:8000
+
+	reverse_proxy frontend:3000
+}

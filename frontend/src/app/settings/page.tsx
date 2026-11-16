@@ -1,7 +1,9 @@
-﻿"use client";
+﻿
+"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
+import { apiFetch } from "@/lib/api";
 import {
   User,
   Building2,
@@ -11,6 +13,10 @@ import {
   Save,
   Camera,
   Lock,
+  Plus,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 
 const sections = [
@@ -21,6 +27,13 @@ const sections = [
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
 
+type Team = {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState("profile");
   const [name, setName] = useState("");
@@ -28,6 +41,17 @@ export default function SettingsPage() {
   const [workspace, setWorkspace] = useState("");
   const [timezone, setTimezone] = useState("Asia/Dhaka");
   const [saved, setSaved] = useState(false);
+
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [teamError, setTeamError] = useState("");
+  const [teamSuccess, setTeamSuccess] = useState("");
+  const [newTeamName, setNewTeamName] = useState("");
+  const [creatingTeam, setCreatingTeam] = useState(false);
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [editingTeamName, setEditingTeamName] = useState("");
+  const [savingTeam, setSavingTeam] = useState(false);
+
   const [notifications, setNotifications] = useState({
     email: true,
     followups: true,
@@ -35,10 +59,117 @@ export default function SettingsPage() {
     assignments: false,
   });
 
+  useEffect(() => {
+    if (activeSection !== "team") return;
+
+    let cancelled = false;
+
+    async function loadTeams() {
+      setTeamsLoading(true);
+      setTeamError("");
+
+      try {
+        const data = await apiFetch<Team[]>("/teams");
+
+        if (!cancelled) {
+          setTeams(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setTeamError(
+            err instanceof Error ? err.message : "Could not load teams."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setTeamsLoading(false);
+        }
+      }
+    }
+
+    loadTeams();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection]);
+
   function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2500);
+  }
+
+  async function createTeam(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const teamName = newTeamName.trim();
+    if (!teamName) return;
+
+    setCreatingTeam(true);
+    setTeamError("");
+    setTeamSuccess("");
+
+    try {
+      const created = await apiFetch<Team>("/teams", {
+        method: "POST",
+        body: JSON.stringify({ name: teamName }),
+      });
+
+      setTeams((current) =>
+        [...current, created].sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setNewTeamName("");
+      setTeamSuccess(`Team "${created.name}" created successfully.`);
+    } catch (err) {
+      setTeamError(
+        err instanceof Error ? err.message : "Could not create team."
+      );
+    } finally {
+      setCreatingTeam(false);
+    }
+  }
+
+  async function renameTeam(teamId: string) {
+    const teamName = editingTeamName.trim();
+    if (!teamName) {
+      setTeamError("Team name cannot be empty.");
+      return;
+    }
+
+    setSavingTeam(true);
+    setTeamError("");
+    setTeamSuccess("");
+
+    try {
+      const updated = await apiFetch<Team>(`/teams/${teamId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: teamName }),
+      });
+
+      setTeams((current) =>
+        current
+          .map((team) => (team.id === teamId ? updated : team))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
+
+      setEditingTeamId(null);
+      setEditingTeamName("");
+      setTeamSuccess(`Team renamed to "${updated.name}".`);
+    } catch (err) {
+      setTeamError(
+        err instanceof Error ? err.message : "Could not rename team."
+      );
+    } finally {
+      setSavingTeam(false);
+    }
+  }
+
+  function startEditingTeam(team: Team) {
+    setEditingTeamId(team.id);
+    setEditingTeamName(team.name);
+    setTeamError("");
+    setTeamSuccess("");
   }
 
   return (
@@ -104,7 +235,9 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <p className="font-medium text-slate-800">Profile photo</p>
-                      <p className="mt-1 text-xs text-slate-400">Profile photo upload will be available later.</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Profile photo upload will be available later.
+                      </p>
                       <button type="button" disabled className="mt-2 inline-flex cursor-not-allowed items-center gap-2 text-xs font-medium text-slate-400">
                         <Camera size={14} /> Change photo
                       </button>
@@ -123,7 +256,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
-                    <p className="text-xs text-slate-400">Changes are currently local to this page.</p>
+                    <p className="text-xs text-slate-400">Profile persistence is not connected yet.</p>
                     <button type="submit" className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
                       <Save size={16} /> Save changes
                     </button>
@@ -160,19 +293,131 @@ export default function SettingsPage() {
               )}
 
               {activeSection === "team" && (
-                <div className="space-y-5">
+                <div className="space-y-6">
                   <div className="border-b border-slate-100 pb-5">
-                    <h3 className="text-lg font-semibold text-slate-900">Team members</h3>
-                    <p className="mt-1 text-sm text-slate-500">Manage workspace members and their access.</p>
+                    <h3 className="text-lg font-semibold text-slate-900">Team management</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Create and rename teams in your workspace.
+                    </p>
                   </div>
-                  <div className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-                    <Users size={30} className="text-slate-300" />
-                    <h4 className="mt-3 font-semibold text-slate-700">Team management</h4>
-                    <p className="mt-1 max-w-sm text-sm text-slate-400">Team member records and invitations will appear here when the team API is connected.</p>
+
+                  {teamError && (
+                    <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                      {teamError}
+                    </p>
+                  )}
+
+                  {teamSuccess && (
+                    <p role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
+                      {teamSuccess}
+                    </p>
+                  )}
+
+                  <form onSubmit={createTeam} className="flex flex-col gap-3 sm:flex-row">
+                    <input
+                      value={newTeamName}
+                      onChange={(e) => setNewTeamName(e.target.value)}
+                      maxLength={120}
+                      placeholder="Enter a new team name"
+                      aria-label="New team name"
+                      className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                    <button
+                      type="submit"
+                      disabled={creatingTeam || !newTeamName.trim()}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Plus size={16} />
+                      {creatingTeam ? "Creating..." : "Create team"}
+                    </button>
+                  </form>
+
+                  <div>
+                    <div className="mb-3 flex items-center justify-between">
+                      <h4 className="text-sm font-semibold text-slate-800">Your teams</h4>
+                      <span className="text-xs text-slate-400">{teams.length} teams</span>
+                    </div>
+
+                    {teamsLoading ? (
+                      <p className="rounded-lg bg-slate-50 p-5 text-center text-sm text-slate-500">
+                        Loading teams...
+                      </p>
+                    ) : teams.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
+                        <Users size={28} className="mx-auto text-slate-300" />
+                        <p className="mt-3 text-sm font-medium text-slate-700">No teams found</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Create your first team using the field above.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+                        {teams.map((team) => (
+                          <div key={team.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                            {editingTeamId === team.id ? (
+                              <form
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  renameTeam(team.id);
+                                }}
+                                className="flex min-w-0 flex-1 flex-wrap gap-2"
+                              >
+                                <input
+                                  value={editingTeamName}
+                                  onChange={(e) => setEditingTeamName(e.target.value)}
+                                  maxLength={120}
+                                  aria-label="Rename team"
+                                  autoFocus
+                                  className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                                />
+                                <button
+                                  type="submit"
+                                  disabled={savingTeam || !editingTeamName.trim()}
+                                  aria-label="Save team name"
+                                  className="rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                  <Check size={16} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingTeamId(null);
+                                    setEditingTeamName("");
+                                  }}
+                                  aria-label="Cancel editing"
+                                  className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
+                                >
+                                  <X size={16} />
+                                </button>
+                              </form>
+                            ) : (
+                              <>
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-medium text-slate-800">{team.name}</p>
+                                  <p className="mt-1 text-xs text-slate-400">Team ID: {team.id}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => startEditingTeam(team)}
+                                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                                >
+                                  <Pencil size={14} /> Rename
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
+
                   <div className="rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
                     <p className="font-medium">Roles and permissions</p>
-                    <p className="mt-1 text-xs leading-5 text-blue-700">Access control must be enforced by the backend. This page does not grant or change permissions.</p>
+                    <p className="mt-1 text-xs leading-5 text-blue-700">
+                      Team creation and renaming require administrator access.
+                      Individual member invitations and role management are not
+                      available through the current team API.
+                    </p>
                   </div>
                 </div>
               )}
@@ -193,7 +438,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
                     <p className="font-medium">Security controls</p>
-                    <p className="mt-1 text-xs leading-5">Session management, two-factor authentication and audit logs require backend support.</p>
+                    <p className="mt-1 text-xs leading-5">Session management, two-factor authentication and audit logs require additional backend integration.</p>
                   </div>
                 </div>
               )}
@@ -236,4 +481,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
