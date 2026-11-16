@@ -76,7 +76,9 @@ def wa_account_b(admin_engine, seed):
     return account_id
 
 
-def _whatsapp_payload(account_id: str, message_id: str, sender: str, text_body: str, sender_name: str | None = None):
+def _whatsapp_payload(
+    account_id: str, message_id: str, sender: str, text_body: str, sender_name: str | None = None
+):
     msg = {
         "id": message_id,
         "from": sender,
@@ -94,7 +96,9 @@ def _whatsapp_payload(account_id: str, message_id: str, sender: str, text_body: 
     return json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
 
-def _status_payload(account_id: str, message_id: str, status_str: str, recipient: str = "8801700000000"):
+def _status_payload(
+    account_id: str, message_id: str, status_str: str, recipient: str = "8801700000000"
+):
     value = {
         "messaging_product": "whatsapp",
         "metadata": {"phone_number_id": account_id},
@@ -130,12 +134,18 @@ def test_handshake_verification(hook_client):
     assert res.text == "123456"
 
     # Invalid token returns 403
-    bad_params = {"hub.mode": "subscribe", "hub.verify_token": "wrong-token", "hub.challenge": "123456"}
+    bad_params = {
+        "hub.mode": "subscribe",
+        "hub.verify_token": "wrong-token",
+        "hub.challenge": "123456",
+    }
     bad_res = hook_client.get(URL, params=bad_params)
     assert bad_res.status_code == 403
 
 
-def test_inbound_message_creates_lead_conversation_and_message(hook_client, admin_engine, seed, wa_account_a):
+def test_inbound_message_creates_lead_conversation_and_message(
+    hook_client, admin_engine, seed, wa_account_a
+):
     mid = "wamid.inbound." + uuid.uuid4().hex
     raw_phone = "01712345678"  # Bangladesh local format -> should normalize to +8801712345678
     body = _whatsapp_payload(wa_account_a, mid, raw_phone, "Hello, I want to buy!", "Tanvir Ahmed")
@@ -149,34 +159,48 @@ def test_inbound_message_creates_lead_conversation_and_message(hook_client, admi
         set_tenant(session, seed.a.id)
 
         # 1. Lead created via capture service with normalized E.164 phone
-        lead = session.query(Lead).filter(Lead.tenant_id == seed.a.id, Lead.phone == "+8801712345678").first()
+        lead = (
+            session.query(Lead)
+            .filter(Lead.tenant_id == seed.a.id, Lead.phone == "+8801712345678")
+            .first()
+        )
         assert lead is not None
         assert lead.name == "Tanvir Ahmed"
         assert lead.source == "whatsapp"
 
         # 2. Conversation created with last_inbound_at populated
-        conv = session.query(Conversation).filter(
-            Conversation.tenant_id == seed.a.id,
-            Conversation.lead_id == lead.id,
-            Conversation.channel == "whatsapp",
-        ).first()
+        conv = (
+            session.query(Conversation)
+            .filter(
+                Conversation.tenant_id == seed.a.id,
+                Conversation.lead_id == lead.id,
+                Conversation.channel == "whatsapp",
+            )
+            .first()
+        )
         assert conv is not None
         assert conv.last_inbound_at is not None
         assert conv.external_contact_id == "+8801712345678"
 
         # 3. Inbound message inserted
-        msg = session.query(Message).filter(
-            Message.tenant_id == seed.a.id,
-            Message.conversation_id == conv.id,
-            Message.provider_message_id == mid,
-        ).first()
+        msg = (
+            session.query(Message)
+            .filter(
+                Message.tenant_id == seed.a.id,
+                Message.conversation_id == conv.id,
+                Message.provider_message_id == mid,
+            )
+            .first()
+        )
         assert msg is not None
         assert msg.direction == "inbound"
         assert msg.message_text == "Hello, I want to buy!"
         assert msg.status == "received"
 
 
-def test_duplicate_delivery_deduplicated_and_idempotent(hook_client, admin_engine, seed, wa_account_a):
+def test_duplicate_delivery_deduplicated_and_idempotent(
+    hook_client, admin_engine, seed, wa_account_a
+):
     mid = "wamid.dup." + uuid.uuid4().hex
     body = _whatsapp_payload(wa_account_a, mid, "01811112233", "Double message")
 
@@ -192,10 +216,14 @@ def test_duplicate_delivery_deduplicated_and_idempotent(hook_client, admin_engin
 
     with Session(admin_engine) as session:
         set_tenant(session, seed.a.id)
-        count = session.query(Message).filter(
-            Message.tenant_id == seed.a.id,
-            Message.provider_message_id == mid,
-        ).count()
+        count = (
+            session.query(Message)
+            .filter(
+                Message.tenant_id == seed.a.id,
+                Message.provider_message_id == mid,
+            )
+            .count()
+        )
         assert count == 1
 
 
@@ -209,10 +237,14 @@ def test_bangla_and_emoji_text_stored_correctly(hook_client, admin_engine, seed,
 
     with Session(admin_engine) as session:
         set_tenant(session, seed.a.id)
-        msg = session.query(Message).filter(
-            Message.tenant_id == seed.a.id,
-            Message.provider_message_id == mid,
-        ).first()
+        msg = (
+            session.query(Message)
+            .filter(
+                Message.tenant_id == seed.a.id,
+                Message.provider_message_id == mid,
+            )
+            .first()
+        )
         assert msg is not None
         assert msg.message_text == bangla_emoji
 
@@ -243,7 +275,9 @@ def test_stop_keyword_triggers_optout(hook_client, admin_engine, seed, wa_accoun
         assert lead.opted_out_source == "whatsapp"
 
 
-def test_two_tenants_same_customer_number_get_separate_leads(hook_client, admin_engine, seed, wa_account_a, wa_account_b):
+def test_two_tenants_same_customer_number_get_separate_leads(
+    hook_client, admin_engine, seed, wa_account_a, wa_account_b
+):
     customer_phone = "01700112233"
     mid_a = "wamid.a." + uuid.uuid4().hex
     mid_b = "wamid.b." + uuid.uuid4().hex
@@ -261,13 +295,21 @@ def test_two_tenants_same_customer_number_get_separate_leads(hook_client, admin_
     # Verify Company A has its own lead
     with Session(admin_engine) as session:
         set_tenant(session, seed.a.id)
-        lead_a = session.query(Lead).filter(Lead.tenant_id == seed.a.id, Lead.phone == "+8801700112233").first()
+        lead_a = (
+            session.query(Lead)
+            .filter(Lead.tenant_id == seed.a.id, Lead.phone == "+8801700112233")
+            .first()
+        )
         assert lead_a is not None
 
     # Verify Company B has its own distinct lead
     with Session(admin_engine) as session:
         set_tenant(session, seed.b.id)
-        lead_b = session.query(Lead).filter(Lead.tenant_id == seed.b.id, Lead.phone == "+8801700112233").first()
+        lead_b = (
+            session.query(Lead)
+            .filter(Lead.tenant_id == seed.b.id, Lead.phone == "+8801700112233")
+            .first()
+        )
         assert lead_b is not None
         assert lead_b.id != lead_a.id
 
@@ -300,4 +342,3 @@ def test_unknown_phone_number_id_returns_200_and_processes_nothing(hook_client, 
         set_tenant(session, seed.a.id)
         count = session.query(Message).filter(Message.provider_message_id == mid).count()
         assert count == 0
-

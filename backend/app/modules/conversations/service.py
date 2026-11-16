@@ -4,20 +4,11 @@ from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.permissions import apply_data_scope
 from app.core.tenancy import TenantContext
-from app.modules.ai.models import LeadAssessment
-from app.modules.ai.provider import AIProviderError, analyze_with_openai
-from app.modules.ai.service import (
-    PROMPT_VERSION,
-    build_assessment_prompt,
-    persist_assessment,
-)
 from app.modules.auth.errors import AuthError
 from app.modules.conversations.models import Conversation, Message
 from app.modules.conversations.schemas import (
-    ConversationAnalysisOut,
     ConversationCreate,
     ConversationOut,
     MessageOut,

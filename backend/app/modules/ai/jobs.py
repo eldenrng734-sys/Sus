@@ -115,7 +115,6 @@ def default_analyzer(job: JobInput) -> AnalysisResult:
 
 def _failed_result() -> AnalysisResult:
     return AnalysisResult(
-        output={}, model="unavailable", prompt_version=PROMPT_VERSION, status="failed"
         output={},
         model="unavailable",
         prompt_version=PROMPT_VERSION,
@@ -207,7 +206,6 @@ def _mark(db: Session, event: ClaimedEvent, status: str, error: str | None) -> N
 
 
 def _finish(
-    session_factory: SessionFactory, event: ClaimedEvent, status: str, error: str | None
     session_factory: SessionFactory,
     event: ClaimedEvent,
     status: str,
@@ -251,8 +249,6 @@ def _load(db: Session, event: ClaimedEvent) -> _Loaded | None:
 
     lead = db.execute(
         text(
-            "SELECT name, email, phone, company_name, created_at "
-            "FROM leads WHERE tenant_id = :t AND id = :l"
             """
             SELECT name, email, phone, company_name, created_at
               FROM leads
@@ -336,9 +332,10 @@ def _run_analyzer(analyzer: Analyzer, job: JobInput) -> AnalysisResult:
             type(exc).__name__,
         )
         return _failed_result()
-    if (
-        not isinstance(result, AnalysisResult)
-        or result.status not in ("ok", "fallback", "failed")
+    if not isinstance(result, AnalysisResult) or result.status not in (
+        "ok",
+        "fallback",
+        "failed",
     ):
         return _failed_result()
     return result
