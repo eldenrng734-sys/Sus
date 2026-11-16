@@ -48,3 +48,16 @@ class TimelineEvent(BaseModel):
     at: datetime
     summary: str | None = None
     details: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConversationAnalysisOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    summary: str | None
+    sentiment: str | None
+    confidence: float | None
+    needs_human_review: bool
+    status: Literal["ok", "fallback", "failed"]
+    model: str
+    prompt_version: str
+    created_at: datetime

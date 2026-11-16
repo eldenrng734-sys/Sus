@@ -8,9 +8,33 @@ from app.core.permissions import require_any_member
 from app.core.tenancy import TenantContext
 from app.database.session import get_session
 from app.modules.conversations import service
-from app.modules.conversations.schemas import ConversationCreate
+from app.modules.conversations.schemas import ConversationAnalysisOut, ConversationCreate
 
 router = APIRouter(prefix="/api/v1", tags=["conversations"])
+
+
+@router.post(
+    "/conversations/{conversation_id}/analyze",
+    response_model=dict[str, ConversationAnalysisOut],
+)
+def analyze_conversation(
+    conversation_id: uuid.UUID,
+    context: TenantContext = Depends(require_any_member),
+    session: Session = Depends(get_session),
+) -> dict:
+    return {"data": service.analyze_conversation(session, context, conversation_id)}
+
+
+@router.get(
+    "/conversations/{conversation_id}/analysis",
+    response_model=dict[str, ConversationAnalysisOut],
+)
+def get_conversation_analysis(
+    conversation_id: uuid.UUID,
+    context: TenantContext = Depends(require_any_member),
+    session: Session = Depends(get_session),
+) -> dict:
+    return {"data": service.get_conversation_analysis(session, context, conversation_id)}
 
 
 @router.post("/conversations", status_code=201)
