@@ -13,9 +13,11 @@ from app.modules.auth.router import router as auth_router
 from app.modules.conversations.router import router as conversations_router
 from app.modules.integrations.router import router as integrations_router
 from app.modules.integrations.webhook_router import router as webhook_router
+from app.modules.invitations.router import router as invitations_router
 from app.modules.lead_forms.router import router as lead_forms_router
 from app.modules.leads.router import router as leads_router
 from app.modules.messaging.router import router as messaging_router
+from app.modules.notifications.router import router as notifications_router
 from app.modules.teams.router import router as teams_router
 
 logging.basicConfig(level=logging.INFO)
@@ -93,6 +95,8 @@ def health() -> dict[str, str]:
 
 app.include_router(auth_router)
 app.include_router(password_reset_router)
+app.include_router(invitations_router)
+app.include_router(notifications_router)
 app.include_router(assessments_router)
 app.include_router(conversations_router)
 app.include_router(lead_forms_router)

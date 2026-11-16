@@ -25,6 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.outbox import emit_message_received
 from app.modules.conversations.models import Conversation, Message
 from app.modules.leads.capture import CaptureInput, CaptureResult, capture_lead
 from app.modules.leads.optout import apply_opt_out, is_opt_out_message
@@ -154,15 +155,11 @@ def store_inbound_message(
     if inbound.body_text and is_opt_out_message(inbound.body_text):
         apply_opt_out(session, lead.id, source=inbound.source)
 
-    emit(
-        "message.received",
-        {
-            "tenant_id": str(tenant_id),
-            "conversation_id": str(conversation.id),
-            "message_id": str(message.id),
-            "lead_id": str(lead.id),
-            "channel": inbound.channel,
-        },
+    emit_message_received(
+        session,
+        tenant_id=tenant_id,
+        message_id=message.id,
+        conversation_id=conversation.id,
     )
 
     return InboundResult(capture=capture, conversation=conversation, message=message)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { fetchLeads } from "@/lib/leads-api";
 
 type Lead = {
@@ -157,6 +158,12 @@ export default function LeadsPage() {
               Manage and track your leads
             </p>
           </div>
+          <Link
+            href="/leads/new"
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Create lead
+          </Link>
         </div>
 
         <div className="mb-6 grid gap-3 rounded-lg border bg-white p-4 md:grid-cols-2 lg:grid-cols-4">
@@ -250,7 +257,9 @@ export default function LeadsPage() {
                   {leads.map((lead) => (
                     <tr key={lead.id} className="hover:bg-gray-50">
                       <td className="p-4 font-medium text-gray-900">
-                        {lead.name}
+                        <Link className="hover:underline" href={`/leads/${lead.id}`}>
+                          {lead.name}
+                        </Link>
                       </td>
                       <td className="p-4">
                         {lead.company_name || "-"}

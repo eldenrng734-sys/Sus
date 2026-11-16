@@ -194,9 +194,7 @@ MAX_EVENT_ERROR_LENGTH = 500
 def mark_webhook_event_processing(webhook_event_id: uuid.UUID, session: Session) -> None:
     """Mark a receipt as queued for post-commit processing (no commit)."""
     session.execute(
-        update(WebhookEvent)
-        .where(WebhookEvent.id == webhook_event_id)
-        .values(status="processing")
+        update(WebhookEvent).where(WebhookEvent.id == webhook_event_id).values(status="processing")
     )
 
 
@@ -233,4 +231,3 @@ def mark_webhook_event_failed(
             processed_at=datetime.now(UTC),
         )
     )
-

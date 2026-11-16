@@ -1,11 +1,14 @@
+import asyncio
 import json
 import uuid
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.modules.auth.errors import AuthError
 from app.modules.integrations import webhooks
+from app.modules.integrations.protocols import ParsedEvent
 from app.modules.integrations.webhooks import extract_events
 
 
@@ -102,79 +105,103 @@ def test_malformed_payload_is_rejected(bad_payload):
 def _configure_receive(monkeypatch, session, insert_result):
     integration_id = uuid.uuid4()
     tenant_id = uuid.uuid4()
-    session.scalar.return_value = insert_result
-    monkeypatch.setattr(webhooks, "verify_signature", lambda *args: True)
+    event = ParsedEvent(
+        account_id="pn-1",
+        event_id="wamid.1",
+        event_type="message",
+        data={"message": {"text": {"body": "private customer message"}}},
+    )
+    provider = SimpleNamespace(
+        verify_signature=lambda *_args: True,
+        parse=lambda _payload: [event],
+        handle=AsyncMock(return_value=None),
+    )
+    monkeypatch.setattr(
+        webhooks,
+        "get_provider",
+        lambda *_args: provider,
+    )
     monkeypatch.setattr(
         webhooks,
         "_resolve_integration",
-        lambda *_args: (integration_id, tenant_id),
+        lambda *_args: (tenant_id, integration_id),
     )
-    return integration_id, tenant_id
+    monkeypatch.setattr(
+        webhooks,
+        "record_event",
+        MagicMock(return_value=insert_result),
+    )
+    return integration_id, tenant_id, event, provider
 
 
-def test_receive_publishes_new_message_after_commit_without_message_content(monkeypatch):
+def test_receive_runs_deferred_provider_job_only_after_commit(monkeypatch):
     session = MagicMock()
-    _integration_id, tenant_id = _configure_receive(monkeypatch, session, uuid.uuid4())
-    published = []
+    integration_id, tenant_id, event, provider = _configure_receive(
+        monkeypatch, session, uuid.uuid4()
+    )
+    jobs = []
 
-    def publish(name, payload):
+    async def after_commit_job():
         assert session.commit.call_count == 1
-        published.append((name, payload))
+        jobs.append(True)
 
-    monkeypatch.setattr(webhooks.event_emitter, "publish", publish)
-    payload = _whatsapp_payload(
-        messages=[{"id": "wamid.1", "text": {"body": "private customer message"}}]
-    )
+    provider.handle.return_value = [after_commit_job]
 
-    result = webhooks.receive(
-        session,
-        "whatsapp",
-        json.dumps(payload).encode(),
-        "valid-signature",
-    )
-
-    assert result == {"stored": 1, "duplicates": 0}
-    assert len(published) == 1
-    event_name, event_payload = published[0]
-    assert event_name.value == "message.received"
-    assert event_payload["tenant_id"] == tenant_id
-    assert event_payload["message_id"] == "wamid.1"
-    assert event_payload["provider"] == "whatsapp"
-    assert event_payload["occurred_at"].tzinfo is not None
-    assert set(event_payload) == {"tenant_id", "message_id", "provider", "occurred_at"}
-
-
-def test_receive_does_not_publish_duplicate_message(monkeypatch):
-    session = MagicMock()
-    _configure_receive(monkeypatch, session, None)
-    publish = MagicMock()
-    monkeypatch.setattr(webhooks.event_emitter, "publish", publish)
-
-    result = webhooks.receive(
-        session,
-        "whatsapp",
-        json.dumps(_whatsapp_payload(messages=[{"id": "wamid.1"}])).encode(),
-        "valid-signature",
-    )
-
-    assert result == {"stored": 0, "duplicates": 1}
-    publish.assert_not_called()
-
-
-def test_receive_does_not_publish_when_commit_fails(monkeypatch):
-    session = MagicMock()
-    _configure_receive(monkeypatch, session, uuid.uuid4())
-    session.commit.side_effect = RuntimeError("commit failed")
-    publish = MagicMock()
-    monkeypatch.setattr(webhooks.event_emitter, "publish", publish)
-
-    with pytest.raises(RuntimeError, match="commit failed"):
+    result = asyncio.run(
         webhooks.receive(
             session,
             "whatsapp",
-            json.dumps(_whatsapp_payload(messages=[{"id": "wamid.1"}])).encode(),
+            json.dumps(_whatsapp_payload()).encode(),
             "valid-signature",
+        )
+    )
+
+    assert result == {"stored": 1, "duplicates": 0, "skipped": 0}
+    assert jobs == [True]
+    provider.handle.assert_awaited_once_with(
+        event,
+        session,
+        tenant_id,
+        integration_id,
+        webhooks.record_event.return_value,
+    )
+
+
+def test_receive_skips_duplicate_event_without_calling_provider(monkeypatch):
+    session = MagicMock()
+    _integration_id, _tenant_id, _event, provider = _configure_receive(monkeypatch, session, None)
+
+    result = asyncio.run(
+        webhooks.receive(
+            session,
+            "whatsapp",
+            json.dumps(_whatsapp_payload()).encode(),
+            "valid-signature",
+        )
+    )
+
+    assert result == {"stored": 0, "duplicates": 1, "skipped": 0}
+    provider.handle.assert_not_awaited()
+
+
+def test_receive_does_not_run_deferred_job_when_commit_fails(monkeypatch):
+    session = MagicMock()
+    _integration_id, _tenant_id, _event, provider = _configure_receive(
+        monkeypatch, session, uuid.uuid4()
+    )
+    session.commit.side_effect = RuntimeError("commit failed")
+    job = AsyncMock()
+    provider.handle.return_value = [job]
+
+    with pytest.raises(RuntimeError, match="commit failed"):
+        asyncio.run(
+            webhooks.receive(
+                session,
+                "whatsapp",
+                json.dumps(_whatsapp_payload()).encode(),
+                "valid-signature",
+            )
         )
 
     session.rollback.assert_called_once()
-    publish.assert_not_called()
+    job.assert_not_awaited()

@@ -60,7 +60,9 @@ def enqueue_event(
     )
 
 
-def emit_lead_created(db: Session, *, tenant_id: uuid.UUID, lead_id: uuid.UUID, source: str) -> None:
+def emit_lead_created(
+    db: Session, *, tenant_id: uuid.UUID, lead_id: uuid.UUID, source: str
+) -> None:
     enqueue_event(
         db,
         tenant_id=tenant_id,

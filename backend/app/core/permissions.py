@@ -43,11 +43,11 @@ def require_platform_admin(
     session: Session = Depends(get_session),
 ) -> PlatformAdminContext:
     """Verify a platform admin without requiring tenant membership."""
-    user_id, session_id = tenancy._claims(authorization)
+    user_id, session_id, amr = tenancy._claims(authorization)
 
     # Validates active user and live refresh-token session.
     # Sets only the authenticated user context, not a tenant context.
-    tenancy._check_user_and_session(session, user_id, session_id)
+    tenancy._check_user_and_session(session, user_id, session_id, amr)
 
     user = session.get(User, user_id)
     if user is None or not user.is_platform_admin:

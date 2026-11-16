@@ -1,11 +1,10 @@
 import uuid
-from typing import Annotated
 
-import jwt
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.security import decode_access_token
+from app.core.permissions import require_admin
+from app.core.tenancy import TenantContext
 from app.database.session import get_session
 from app.modules.auth.errors import AuthError
 from app.modules.invitations import service
@@ -16,16 +15,18 @@ router = APIRouter(prefix="/api/v1", tags=["invitations"])
 
 
 def current_admin(
-    authorization: Annotated[str | None, Header()] = None,
+    context: TenantContext = Depends(require_admin),
     session: Session = Depends(get_session),
 ) -> TenantMembership:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise AuthError(401, "unauthorized", "Missing access token")
-    try:
-        payload = decode_access_token(authorization[7:])
-    except jwt.PyJWTError:
-        raise AuthError(401, "unauthorized", "Invalid or expired token") from None
-    return service.get_admin_membership(session, uuid.UUID(payload["sub"]))
+    membership = session.get(TenantMembership, context.membership_id)
+    if (
+        membership is None
+        or not membership.is_active
+        or membership.role != "admin"
+        or membership.tenant_id != context.tenant_id
+    ):
+        raise AuthError(403, "forbidden", "Admin access required")
+    return membership
 
 
 @router.post("/invitations", status_code=201)

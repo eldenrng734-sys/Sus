@@ -37,7 +37,14 @@ from typing import Literal
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.modules.ai.service import PROMPT_VERSION, persist_assessment, redact_pii
+from app.core.config import settings
+from app.modules.ai.provider import AIProviderError, analyze_with_openai
+from app.modules.ai.service import (
+    PROMPT_VERSION,
+    build_assessment_prompt,
+    persist_assessment,
+    redact_pii,
+)
 
 logger = logging.getLogger("app.ai.jobs")
 
@@ -85,15 +92,25 @@ Analyzer = Callable[[JobInput], AnalysisResult]
 
 
 def default_analyzer(job: JobInput) -> AnalysisResult:
-    """TODO: wire this to the real LLM analysis (classification + summary + sentiment).
+    """Run the configured conversation analyzer over the already-redacted input."""
+    configured_key = settings.openai_api_key
+    api_key = configured_key.get_secret_value() if configured_key is not None else ""
+    if not api_key.strip():
+        raise AIProviderError("AI conversation analysis is not configured")
 
-    persist_assessment(status="ok") requires summary AND sentiment, which
-    classify_message() alone does not return. Call the conversation-analysis
-    function Dev 5 built, then return AnalysisResult(output=..., model=...,
-    prompt_version=..., status="ok"). On provider or validation failure return
-    status "fallback" or "failed" instead of raising.
-    """
-    raise NotImplementedError("wire default_analyzer to the LLM analysis function")
+    prompt = build_assessment_prompt(job.redacted_messages, pii_values=job.pii_values)
+    output = analyze_with_openai(
+        prompt,
+        api_key=api_key,
+        model=settings.openai_model,
+        timeout_seconds=settings.openai_timeout_seconds,
+    )
+    return AnalysisResult(
+        output=output.model_dump(),
+        model=settings.openai_model,
+        prompt_version=prompt["prompt_version"],
+        status="ok",
+    )
 
 
 def _failed_result() -> AnalysisResult:
@@ -157,10 +174,7 @@ def claim_batch(
             },
         ).all()
         db.commit()
-    return [
-        ClaimedEvent(r.id, r.tenant_id, r.event_type, r.aggregate_id, r.attempts)
-        for r in rows
-    ]
+    return [ClaimedEvent(r.id, r.tenant_id, r.event_type, r.aggregate_id, r.attempts) for r in rows]
 
 
 # --------------------------------------------------------------------------- helpers
@@ -315,9 +329,10 @@ def _run_analyzer(analyzer: Analyzer, job: JobInput) -> AnalysisResult:
             type(exc).__name__,
         )
         return _failed_result()
-    if (
-        not isinstance(result, AnalysisResult)
-        or result.status not in ("ok", "fallback", "failed")
+    if not isinstance(result, AnalysisResult) or result.status not in (
+        "ok",
+        "fallback",
+        "failed",
     ):
         return _failed_result()
     return result

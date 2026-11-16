@@ -52,9 +52,7 @@ def get_key(version: int = 1) -> bytes:
     if version == 1:
         raw_secret = settings.integration_encryption_key.get_secret_value().strip()
         if not raw_secret:
-            raise RuntimeError(
-                "INTEGRATION_ENCRYPTION_KEY is not configured in settings."
-            )
+            raise RuntimeError("INTEGRATION_ENCRYPTION_KEY is not configured in settings.")
         try:
             decoded = base64.b64decode(raw_secret)
         except Exception as exc:
