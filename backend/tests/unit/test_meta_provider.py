@@ -147,11 +147,7 @@ def test_entries_without_page_id_are_skipped():
     payload = {
         "object": "page",
         "entry": [
-            {
-                "changes": [
-                    {"field": "leadgen", "value": {"leadgen_id": str(uuid.uuid4().int)}}
-                ]
-            }
+            {"changes": [{"field": "leadgen", "value": {"leadgen_id": str(uuid.uuid4().int)}}]}
         ],
     }
 
@@ -180,9 +176,9 @@ def test_extract_lead_fields_keeps_unknown_fields_and_first_value():
 
 def test_subscribe_page_sends_required_fields_and_header():
     with respx.mock(base_url="https://graph.facebook.com", assert_all_called=False) as mock:
-        route = mock.post(
-            path__regex=rf"^/v\d+\.\d+/{PAGE_ID}/subscribed_apps$"
-        ).respond(200, json={"success": True})
+        route = mock.post(path__regex=rf"^/v\d+\.\d+/{PAGE_ID}/subscribed_apps$").respond(
+            200, json={"success": True}
+        )
 
         asyncio.run(subscribe_page(PAGE_ID, "page-token"))
 

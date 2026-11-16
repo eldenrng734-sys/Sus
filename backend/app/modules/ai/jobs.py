@@ -174,10 +174,7 @@ def claim_batch(
             },
         ).all()
         db.commit()
-    return [
-        ClaimedEvent(r.id, r.tenant_id, r.event_type, r.aggregate_id, r.attempts)
-        for r in rows
-    ]
+    return [ClaimedEvent(r.id, r.tenant_id, r.event_type, r.aggregate_id, r.attempts) for r in rows]
 
 
 # --------------------------------------------------------------------------- helpers

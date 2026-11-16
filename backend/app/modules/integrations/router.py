@@ -113,4 +113,3 @@ def disconnect(
         status=integration.status,
     )
     return {"data": resp.model_dump()}
-

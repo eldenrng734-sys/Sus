@@ -13,4 +13,3 @@ def register_provider(provider: WebhookProvider) -> None:
 def get_provider(name: str) -> WebhookProvider | None:
     """Retrieve a registered provider by name (e.g. 'whatsapp', 'meta')."""
     return _providers.get(name)
-

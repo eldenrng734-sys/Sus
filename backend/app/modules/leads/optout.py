@@ -78,9 +78,7 @@ def apply_opt_out(
         lead.version += 1
 
         # Cancel open automated follow-up tasks if the table exists
-        has_tasks = session.execute(
-            text("SELECT to_regclass('public.tasks')")
-        ).scalar() is not None
+        has_tasks = session.execute(text("SELECT to_regclass('public.tasks')")).scalar() is not None
 
         if has_tasks:
             session.execute(
