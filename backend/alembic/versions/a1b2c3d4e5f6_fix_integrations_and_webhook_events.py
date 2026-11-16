@@ -91,6 +91,39 @@ def _idx_exists(conn, idx: str) -> bool:
     )
 
 
+def _drop_webhook_lookup_policy() -> None:
+    """Temporarily remove the policy before altering its referenced columns."""
+    op.execute("""
+        DROP POLICY IF EXISTS integrations_webhook_lookup
+        ON public.integrations
+    """)
+
+
+def _create_webhook_lookup_policy() -> None:
+    """Restore the original restricted webhook lookup policy."""
+    op.execute("""
+        CREATE POLICY integrations_webhook_lookup
+        ON public.integrations
+        FOR SELECT
+        TO crm_app
+        USING (
+            provider = NULLIF(
+                current_setting('app.webhook_provider', true),
+                ''
+            )
+            AND provider_account_id = NULLIF(
+                current_setting('app.webhook_account_id', true),
+                ''
+            )
+            AND status = 'active'
+            AND (
+                expires_at IS NULL
+                OR expires_at > now()
+            )
+        )
+    """)
+
+
 def _rls_up(table: str) -> None:
     """Enable, force, and create the standard tenant-isolation policy."""
     op.execute(f'ALTER TABLE "{table}" ENABLE ROW LEVEL SECURITY')
@@ -110,17 +143,29 @@ def _rls_up(table: str) -> None:
 def upgrade() -> None:
     conn = op.get_bind()
 
+    # The webhook lookup policy depends on provider, provider_account_id,
+    # and status. Drop it temporarily before changing those column types.
+    _drop_webhook_lookup_policy()
+
     # ------------------------------------------------------------------ #
     # integrations                                                       #
     # ------------------------------------------------------------------ #
 
     # 1. Drop the old 3-column unique; replace with two targeted uniques.
     if _con_exists(conn, "integrations", "uq_integrations_account"):
-        op.drop_constraint("uq_integrations_account", "integrations", type_="unique")
+        op.drop_constraint(
+            "uq_integrations_account",
+            "integrations",
+            type_="unique",
+        )
+
     if not _con_exists(conn, "integrations", "uq_integrations_tenant_id_id"):
         op.create_unique_constraint(
-            "uq_integrations_tenant_id_id", "integrations", ["tenant_id", "id"]
+            "uq_integrations_tenant_id_id",
+            "integrations",
+            ["tenant_id", "id"],
         )
+
     if not _con_exists(conn, "integrations", "uq_integrations_provider_account"):
         op.create_unique_constraint(
             "uq_integrations_provider_account",
@@ -131,6 +176,7 @@ def upgrade() -> None:
     # 2. Rename check constraint.
     if _con_exists(conn, "integrations", "ck_integrations_status_valid"):
         op.execute('ALTER TABLE integrations DROP CONSTRAINT "ck_integrations_status_valid"')
+
     if not _con_exists(conn, "integrations", "ck_integrations_status"):
         op.execute(
             "ALTER TABLE integrations ADD CONSTRAINT ck_integrations_status "
@@ -163,13 +209,19 @@ def upgrade() -> None:
     scopes_type = conn.execute(
         sa.text(
             "SELECT data_type FROM information_schema.columns "
-            "WHERE table_schema='public' AND table_name='integrations' AND column_name='scopes'"
+            "WHERE table_schema='public' "
+            "AND table_name='integrations' AND column_name='scopes'"
         )
     ).scalar()
+
     if scopes_type == "jsonb":
         op.add_column(
             "integrations",
-            sa.Column("scopes_new", postgresql.ARRAY(sa.String()), nullable=True),
+            sa.Column(
+                "scopes_new",
+                postgresql.ARRAY(sa.String()),
+                nullable=True,
+            ),
         )
         op.execute(
             """
@@ -181,8 +233,13 @@ def upgrade() -> None:
             """
         )
         op.drop_column("integrations", "scopes")
-        op.alter_column("integrations", "scopes_new", new_column_name="scopes", nullable=False)
-        op.execute("ALTER TABLE integrations ALTER COLUMN scopes SET DEFAULT '{}' ")
+        op.alter_column(
+            "integrations",
+            "scopes_new",
+            new_column_name="scopes",
+            nullable=False,
+        )
+        op.execute("ALTER TABLE integrations ALTER COLUMN scopes SET DEFAULT '{}'")
 
     # 6. Tighten String lengths.
     op.alter_column(
@@ -207,6 +264,9 @@ def upgrade() -> None:
         existing_nullable=False,
     )
 
+    # Restore the exact original webhook lookup policy.
+    _create_webhook_lookup_policy()
+
     # 7. Add query index.
     if not _idx_exists(conn, "ix_integrations_tenant_provider"):
         op.create_index(
@@ -225,9 +285,17 @@ def upgrade() -> None:
             "webhook_events",
             sa.Column("integration_id", sa.UUID(), nullable=True),
         )
-        op.alter_column("webhook_events", "integration_id", nullable=False)
+        op.alter_column(
+            "webhook_events",
+            "integration_id",
+            nullable=False,
+        )
 
-    if not _con_exists(conn, "webhook_events", "fk_webhook_events_tenant_integration"):
+    if not _con_exists(
+        conn,
+        "webhook_events",
+        "fk_webhook_events_tenant_integration",
+    ):
         op.create_foreign_key(
             "fk_webhook_events_tenant_integration",
             "webhook_events",
@@ -263,17 +331,32 @@ def upgrade() -> None:
     )
 
     # 5. Replace status check.
-    if _con_exists(conn, "webhook_events", "ck_webhook_events_status_valid"):
+    if _con_exists(
+        conn,
+        "webhook_events",
+        "ck_webhook_events_status_valid",
+    ):
         op.execute('ALTER TABLE webhook_events DROP CONSTRAINT "ck_webhook_events_status_valid"')
-    if not _con_exists(conn, "webhook_events", "ck_webhook_events_status"):
+
+    if not _con_exists(
+        conn,
+        "webhook_events",
+        "ck_webhook_events_status",
+    ):
         op.execute(
-            "ALTER TABLE webhook_events ADD CONSTRAINT ck_webhook_events_status "
-            "CHECK (status IN ('received', 'processing', 'processed', 'failed', 'ignored'))"
+            "ALTER TABLE webhook_events ADD CONSTRAINT "
+            "ck_webhook_events_status "
+            "CHECK (status IN "
+            "('received', 'processing', 'processed', 'failed', 'ignored'))"
         )
 
     # 6. Replace index.
     if _idx_exists(conn, "ix_webhook_events_tenant_received"):
-        op.drop_index("ix_webhook_events_tenant_received", table_name="webhook_events")
+        op.drop_index(
+            "ix_webhook_events_tenant_received",
+            table_name="webhook_events",
+        )
+
     if not _idx_exists(conn, "ix_webhook_events_tenant_status"):
         op.create_index(
             "ix_webhook_events_tenant_status",
@@ -303,7 +386,11 @@ def upgrade() -> None:
     if not _col_exists(conn, "conversations", "external_contact_id"):
         op.add_column(
             "conversations",
-            sa.Column("external_contact_id", sa.String(128), nullable=True),
+            sa.Column(
+                "external_contact_id",
+                sa.String(128),
+                nullable=True,
+            ),
         )
 
     # ------------------------------------------------------------------ #
@@ -313,10 +400,13 @@ def upgrade() -> None:
         row = conn.execute(
             sa.text(
                 "SELECT relrowsecurity, relforcerowsecurity "
-                "FROM pg_class WHERE relname = :t AND relnamespace = 'public'::regnamespace"
+                "FROM pg_class "
+                "WHERE relname = :t "
+                "AND relnamespace = 'public'::regnamespace"
             ),
             {"t": table},
         ).one_or_none()
+
         if row and not (row.relrowsecurity and row.relforcerowsecurity):
             _rls_up(table)
         elif row:
@@ -330,11 +420,14 @@ def upgrade() -> None:
                 ).scalars()
             )
             policy_name = f"{table}_tenant_isolation"
+
             if policy_name not in existing_policies:
                 op.execute(
                     f'CREATE POLICY {policy_name} ON "{table}" TO crm_app '
-                    f"USING (tenant_id = {GUC}) WITH CHECK (tenant_id = {GUC})"
+                    f"USING (tenant_id = {GUC}) "
+                    f"WITH CHECK (tenant_id = {GUC})"
                 )
+
             op.execute(f'GRANT SELECT, INSERT, UPDATE, DELETE ON "{table}" TO crm_app')
 
     missing = (
@@ -345,8 +438,10 @@ def upgrade() -> None:
                 FROM pg_class c
                 JOIN pg_namespace n ON n.oid = c.relnamespace
                 JOIN information_schema.columns col
-                  ON col.table_schema = n.nspname AND col.table_name = c.relname
-                WHERE n.nspname = 'public' AND c.relkind = 'r'
+                  ON col.table_schema = n.nspname
+                 AND col.table_name = c.relname
+                WHERE n.nspname = 'public'
+                  AND c.relkind = 'r'
                   AND col.column_name = 'tenant_id'
                   AND NOT (c.relrowsecurity AND c.relforcerowsecurity)
                 """
@@ -355,8 +450,10 @@ def upgrade() -> None:
         .scalars()
         .all()
     )
+
     EXEMPT = {"refresh_tokens"}
     missing = sorted(set(missing) - EXEMPT)
+
     if missing:
         raise RuntimeError(f"Tenant tables without RLS after migration: {missing}")
 
@@ -369,11 +466,17 @@ def upgrade() -> None:
 def downgrade() -> None:
     conn = op.get_bind()
 
+    # Drop the policy before reverting the types of its referenced columns.
+    _drop_webhook_lookup_policy()
+
     # ------------------------------------------------------------------ #
     # conversations                                                      #
     # ------------------------------------------------------------------ #
     if _col_exists(conn, "conversations", "external_contact_id"):
-        op.drop_column("conversations", "external_contact_id")
+        op.drop_column(
+            "conversations",
+            "external_contact_id",
+        )
 
     # ------------------------------------------------------------------ #
     # webhook_events                                                     #
@@ -394,7 +497,11 @@ def downgrade() -> None:
     )
 
     if _idx_exists(conn, "ix_webhook_events_tenant_status"):
-        op.drop_index("ix_webhook_events_tenant_status", table_name="webhook_events")
+        op.drop_index(
+            "ix_webhook_events_tenant_status",
+            table_name="webhook_events",
+        )
+
     if not _idx_exists(conn, "ix_webhook_events_tenant_received"):
         op.create_index(
             "ix_webhook_events_tenant_received",
@@ -402,12 +509,23 @@ def downgrade() -> None:
             ["tenant_id", "received_at"],
         )
 
-    if _con_exists(conn, "webhook_events", "ck_webhook_events_status"):
+    if _con_exists(
+        conn,
+        "webhook_events",
+        "ck_webhook_events_status",
+    ):
         op.execute('ALTER TABLE webhook_events DROP CONSTRAINT "ck_webhook_events_status"')
-    if not _con_exists(conn, "webhook_events", "ck_webhook_events_status_valid"):
+
+    if not _con_exists(
+        conn,
+        "webhook_events",
+        "ck_webhook_events_status_valid",
+    ):
         op.execute(
-            "ALTER TABLE webhook_events ADD CONSTRAINT ck_webhook_events_status_valid "
-            "CHECK (status IN ('received', 'processed', 'failed', 'ignored'))"
+            "ALTER TABLE webhook_events ADD CONSTRAINT "
+            "ck_webhook_events_status_valid "
+            "CHECK (status IN "
+            "('received', 'processed', 'failed', 'ignored'))"
         )
 
     op.alter_column(
@@ -421,28 +539,52 @@ def downgrade() -> None:
     if not _col_exists(conn, "webhook_events", "signature_valid"):
         op.add_column(
             "webhook_events",
-            sa.Column("signature_valid", sa.Boolean(), nullable=True),
+            sa.Column(
+                "signature_valid",
+                sa.Boolean(),
+                nullable=True,
+            ),
         )
         op.execute(
             "UPDATE webhook_events SET signature_valid = false WHERE signature_valid IS NULL"
         )
-        op.alter_column("webhook_events", "signature_valid", nullable=False)
+        op.alter_column(
+            "webhook_events",
+            "signature_valid",
+            nullable=False,
+        )
 
     if _col_exists(conn, "webhook_events", "attempts"):
-        op.drop_column("webhook_events", "attempts")
-
-    if _con_exists(conn, "webhook_events", "fk_webhook_events_tenant_integration"):
-        op.drop_constraint(
-            "fk_webhook_events_tenant_integration", "webhook_events", type_="foreignkey"
+        op.drop_column(
+            "webhook_events",
+            "attempts",
         )
+
+    if _con_exists(
+        conn,
+        "webhook_events",
+        "fk_webhook_events_tenant_integration",
+    ):
+        op.drop_constraint(
+            "fk_webhook_events_tenant_integration",
+            "webhook_events",
+            type_="foreignkey",
+        )
+
     if _col_exists(conn, "webhook_events", "integration_id"):
-        op.drop_column("webhook_events", "integration_id")
+        op.drop_column(
+            "webhook_events",
+            "integration_id",
+        )
 
     # ------------------------------------------------------------------ #
     # integrations                                                       #
     # ------------------------------------------------------------------ #
     if _idx_exists(conn, "ix_integrations_tenant_provider"):
-        op.drop_index("ix_integrations_tenant_provider", table_name="integrations")
+        op.drop_index(
+            "ix_integrations_tenant_provider",
+            table_name="integrations",
+        )
 
     op.alter_column(
         "integrations",
@@ -466,12 +608,17 @@ def downgrade() -> None:
         existing_nullable=False,
     )
 
+    # Restore the original policy after restoring its column types.
+    _create_webhook_lookup_policy()
+
     scopes_type = conn.execute(
         sa.text(
             "SELECT data_type FROM information_schema.columns "
-            "WHERE table_schema='public' AND table_name='integrations' AND column_name='scopes'"
+            "WHERE table_schema='public' "
+            "AND table_name='integrations' AND column_name='scopes'"
         )
     ).scalar()
+
     if scopes_type == "ARRAY":
         op.add_column(
             "integrations",
@@ -483,14 +630,28 @@ def downgrade() -> None:
         )
         op.execute("UPDATE integrations SET scopes_old = to_jsonb(scopes)")
         op.drop_column("integrations", "scopes")
-        op.alter_column("integrations", "scopes_old", new_column_name="scopes", nullable=False)
+        op.alter_column(
+            "integrations",
+            "scopes_old",
+            new_column_name="scopes",
+            nullable=False,
+        )
         op.execute("ALTER TABLE integrations ALTER COLUMN scopes SET DEFAULT '[]'::jsonb")
 
     if _col_exists(conn, "integrations", "key_version"):
-        op.drop_column("integrations", "key_version")
+        op.drop_column(
+            "integrations",
+            "key_version",
+        )
 
-    if _col_exists(conn, "integrations", "credentials_encrypted") and not _col_exists(
-        conn, "integrations", "encrypted_credentials"
+    if _col_exists(
+        conn,
+        "integrations",
+        "credentials_encrypted",
+    ) and not _col_exists(
+        conn,
+        "integrations",
+        "encrypted_credentials",
     ):
         op.alter_column(
             "integrations",
@@ -498,19 +659,51 @@ def downgrade() -> None:
             new_column_name="encrypted_credentials",
         )
 
-    if _con_exists(conn, "integrations", "ck_integrations_status"):
+    if _con_exists(
+        conn,
+        "integrations",
+        "ck_integrations_status",
+    ):
         op.execute('ALTER TABLE integrations DROP CONSTRAINT "ck_integrations_status"')
-    if not _con_exists(conn, "integrations", "ck_integrations_status_valid"):
+
+    if not _con_exists(
+        conn,
+        "integrations",
+        "ck_integrations_status_valid",
+    ):
         op.execute(
-            "ALTER TABLE integrations ADD CONSTRAINT ck_integrations_status_valid "
+            "ALTER TABLE integrations ADD CONSTRAINT "
+            "ck_integrations_status_valid "
             "CHECK (status IN ('active', 'disabled', 'error'))"
         )
 
-    if _con_exists(conn, "integrations", "uq_integrations_provider_account"):
-        op.drop_constraint("uq_integrations_provider_account", "integrations", type_="unique")
-    if _con_exists(conn, "integrations", "uq_integrations_tenant_id_id"):
-        op.drop_constraint("uq_integrations_tenant_id_id", "integrations", type_="unique")
-    if not _con_exists(conn, "integrations", "uq_integrations_account"):
+    if _con_exists(
+        conn,
+        "integrations",
+        "uq_integrations_provider_account",
+    ):
+        op.drop_constraint(
+            "uq_integrations_provider_account",
+            "integrations",
+            type_="unique",
+        )
+
+    if _con_exists(
+        conn,
+        "integrations",
+        "uq_integrations_tenant_id_id",
+    ):
+        op.drop_constraint(
+            "uq_integrations_tenant_id_id",
+            "integrations",
+            type_="unique",
+        )
+
+    if not _con_exists(
+        conn,
+        "integrations",
+        "uq_integrations_account",
+    ):
         op.create_unique_constraint(
             "uq_integrations_account",
             "integrations",
