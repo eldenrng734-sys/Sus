@@ -1,0 +1,30 @@
+﻿name,email,phone,company_name,source_campaign,external_id,consent,assigned_to,requirement
+Rahim Uddin,rahim@abctraders.com,+8801712345678,ABC Traders,Eid Offer 2026,EXT-1001,yes,rep1@mycompany.com,Needs CRM for 20-person sales team
+Karim Hossain,,+8801812345678,XYZ Ltd,Eid Offer 2026,EXT-1002,no,,Asked about pricing
+Nusrat Jahan,nusrat.jahan@greenleaf.com.bd,01911223344,Greenleaf Agro,Webinar Oct 2026,EXT-1003,yes,rep2@mycompany.com,Wants a demo this week
+Tanvir Ahmed,tanvir@techbd.io,+8801511223344,TechBD Solutions,Facebook Ads Q4,EXT-1004,yes,rep1@mycompany.com,Looking for WhatsApp integration
+Sabrina Islam,sabrina.islam@fashionhub.com,+8801611445566,Fashion Hub BD,Facebook Ads Q4,EXT-1005,yes,rep3@mycompany.com,"Online shop, 3 sales agents, needs lead tracking"
+Mahmudul Hasan,mahmud@rapidlogistics.com.bd,+8801711556677,Rapid Logistics,Trade Fair 2026,EXT-1006,no,,Wants brochure and price list
+Farzana Rahman,farzana@edunext.edu.bd,+8801811667788,EduNext Academy,Webinar Oct 2026,EXT-1007,yes,rep2@mycompany.com,Admission inquiries management for 5 branches
+Imran Khan,imran.khan@buildwell.com,+8801911778899,BuildWell Construction,Trade Fair 2026,EXT-1008,yes,rep1@mycompany.com,Wants to track site visit leads
+Shirin Akter,shirin@medicare24.com,+8801511889900,MediCare 24,Google Ads Nov,EXT-1009,yes,rep3@mycompany.com,"Clinic appointment follow-up, needs Bangla support"
+Arif Chowdhury,arif@dhakaproperties.com,+8801611990011,Dhaka Properties,Google Ads Nov,EXT-1010,yes,rep2@mycompany.com,"Real estate, 40 leads per week"
+Mitu Sultana,mitu@handloomcraft.com,+8801712001122,Handloom Craft,Instagram Giveaway,EXT-1011,no,,Interested but wants to wait until next quarter
+Rafiq Mia,rafiq@sylhettea.com,+8801812112233,Sylhet Tea Co.,Referral,EXT-1012,yes,rep1@mycompany.com,Wholesale buyers management
+Jannatul Ferdous,jannat@travelwise.com.bd,+8801912223344,TravelWise,Eid Offer 2026,EXT-1013,yes,rep3@mycompany.com,"Tour packages, needs WhatsApp follow-up"
+Sohel Rana,sohel@autoparts.com.bd,+8801512334455,Auto Parts Hub,Trade Fair 2026,EXT-1014,,,Consent not recorded in the source list
+Dilruba Yasmin,dilruba@cloudkitchen.com,+8801612445566,Cloud Kitchen BD,Facebook Ads Q4,EXT-1015,yes,rep2@mycompany.com,"Restaurant chain, 8 outlets"
+Zahid Hasan,zahid@pharmalink.com.bd,+8801712556677,PharmaLink,Webinar Oct 2026,EXT-1016,yes,rep1@mycompany.com,Medical rep visit tracking
+Taslima Begum,,+8801812667788,Taslima Boutique,Instagram Giveaway,EXT-1017,yes,rep3@mycompany.com,"Phone only, small shop, wants price"
+আব্দুল্লাহ আল মামুন,mamun@banglasoft.com,+8801912778899,বাংলা সফট,Webinar Oct 2026,EXT-1018,yes,rep2@mycompany.com,"আমাদের ১৫ জনের সেলস টিমের জন্য CRM দরকার, ডেমো চাই"
+Nasrin Sultana,nasrin@ricemill.com.bd,+8801512889900,Sultana Rice Mill,Referral,EXT-1019,no,,দাম কত জানতে চাই
+Kamrul Islam,kamrul@securenet.com,+8801612990011,SecureNet ISP,Google Ads Nov,EXT-1020,yes,rep1@mycompany.com,"ISP with 500 subscribers, needs support ticket + lead tracking, urgent"
+Rubel Mahmud,rubel@printpoint.com,+8801712110022,Print Point,Trade Fair 2026,EXT-1021,yes,rep3@mycompany.com,"Needs ""bulk"" import, CSV, and reminders"
+Rahim Uddin,RAHIM@ABCTRADERS.COM,01712345678,ABC Traders,Website Form,EXT-1022,yes,rep1@mycompany.com,"DUPLICATE TEST: same person as row 1 (email uppercase, phone local format)"
+Md. Karim,,01812-345678,XYZ Ltd,Website Form,,no,,DUPLICATE TEST: same phone as row 2 in a different format
+Farhana Akter,,,Akter Fashion,Eid Offer 2026,EXT-1025,yes,rep2@mycompany.com,REJECT TEST: no email and no phone
+,noname@example.com,+8801712223344,Unknown Co,Eid Offer 2026,EXT-1026,yes,rep1@mycompany.com,REJECT TEST: name is missing
+Shamim Reza,shamim@@gmail,+8801812334455,Reza Traders,Facebook Ads Q4,EXT-1027,yes,rep3@mycompany.com,REJECT TEST: invalid email
+Liton Das,liton@dasgroup.com,12345,Das Group,Facebook Ads Q4,EXT-1028,yes,rep2@mycompany.com,REJECT TEST: invalid phone number
+Monir Hossain,monir@otherfirm.com,+8801912445566,Hossain Enterprise,Referral,EXT-1029,yes,rep@othercompany.com,REJECT TEST: assigned_to is not a user of this company
+@SUM(1+1),evil@example.com,+8801512556677,"=HYPERLINK(""http://evil.test"",""click"")",Referral,EXT-1030,yes,rep1@mycompany.com,=cmd|' /C calc'!A0
