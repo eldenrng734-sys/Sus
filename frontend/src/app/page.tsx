@@ -1,117 +1,198 @@
-export default function Home() {
+import { Sidebar } from "@/components/layout/sidebar";
+import {
+  Users,
+  UserPlus,
+  CalendarClock,
+  AlertCircle,
+  ArrowUpRight,
+  TrendingUp,
+  Clock3,
+} from "lucide-react";
+
+const metrics = [
+  {
+    label: "Total Leads",
+    value: "--",
+    note: "All leads in your workspace",
+    icon: Users,
+  },
+  {
+    label: "New Leads",
+    value: "--",
+    note: "Recently captured leads",
+    icon: UserPlus,
+  },
+  {
+    label: "Follow-ups Due",
+    value: "--",
+    note: "Scheduled for today",
+    icon: CalendarClock,
+  },
+  {
+    label: "Overdue Tasks",
+    value: "--",
+    note: "Tasks past their due date",
+    icon: AlertCircle,
+  },
+];
+
+export default function DashboardPage() {
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
-      <section className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-10 md:py-16">
-        <nav className="flex items-center justify-between rounded-full border border-slate-200 bg-white/80 px-5 py-3 shadow-sm backdrop-blur-sm">
+    <div className="flex min-h-screen bg-slate-50">
+      <Sidebar />
+
+      <main className="min-w-0 flex-1">
+        <header className="flex min-h-20 items-center justify-between border-b border-slate-200 bg-white px-6 sm:px-8">
+          <div>
+            <p className="text-sm text-slate-500">Workspace / Overview</p>
+            <h1 className="mt-1 text-xl font-bold text-slate-900">
+              Dashboard
+            </h1>
+          </div>
+
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white">
-              S
+            <span className="hidden rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 sm:inline-flex">
+              Sales workspace
+            </span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700">
+              U
             </div>
+          </div>
+        </header>
+
+        <div className="mx-auto max-w-7xl space-y-7 p-6 sm:p-8">
+          <section className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold tracking-[0.2em] text-slate-500 uppercase">
-                Sales Assist
+              <h2 className="text-2xl font-bold text-slate-900">
+                Sales overview
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Monitor your leads and sales activities in one place.
               </p>
             </div>
-          </div>
 
-          <div className="hidden items-center gap-8 text-sm font-medium text-slate-600 md:flex">
-            <a href="#features" className="transition hover:text-slate-900">
-              Features
-            </a>
-            <a href="#insights" className="transition hover:text-slate-900">
-              Insights
-            </a>
-            <a href="#pricing" className="transition hover:text-slate-900">
-              Pricing
-            </a>
-          </div>
-
-          <button className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700">
-            Start free
-          </button>
-        </nav>
-
-        <div className="grid items-center gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-6">
-            <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
-              Built for modern revenue teams
+            <span className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600">
+              Current period
             </span>
+          </section>
 
-            <h1 className="max-w-xl text-4xl font-bold tracking-tight text-slate-900 md:text-6xl">
-              Turn every sales conversation into momentum.
-            </h1>
+          <section className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            {metrics.map((metric) => {
+              const Icon = metric.icon;
 
-            <p className="max-w-lg text-lg leading-8 text-slate-600">
-              Sales Assist helps your team capture opportunities, prioritize follow-ups,
-              and stay on top of every deal with AI-powered guidance.
-            </p>
-
-            <div className="flex flex-col gap-4 sm:flex-row">
-              <button className="rounded-full bg-emerald-500 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-600">
-                Book a demo
-              </button>
-              <button className="rounded-full border border-slate-300 bg-white px-6 py-3 text-base font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50">
-                View dashboard
-              </button>
-            </div>
-
-            <div className="flex items-center gap-6 pt-2 text-sm text-slate-500">
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                24/7 pipeline visibility
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                3x faster follow-up
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/60">
-            <div className="rounded-2xl bg-slate-900 p-5 text-white">
-              <div className="mb-6 flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-300">Quarterly pipeline</p>
-                  <h2 className="mt-1 text-3xl font-bold">$2.4M</h2>
-                </div>
-                <div className="rounded-full bg-emerald-500/20 px-3 py-1 text-sm font-medium text-emerald-300">
-                  +18.4%
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {[
-                  { label: 'Qualified leads', value: '318', width: 'w-3/4' },
-                  { label: 'Demo bookings', value: '92', width: 'w-2/3' },
-                  { label: 'Conversions', value: '41%', width: 'w-2/5' },
-                ].map((item) => (
-                  <div key={item.label}>
-                    <div className="mb-2 flex items-center justify-between text-sm text-slate-300">
-                      <span>{item.label}</span>
-                      <span>{item.value}</span>
-                    </div>
-                    <div className="h-2.5 rounded-full bg-slate-700">
-                      <div className={`h-2.5 rounded-full bg-emerald-400 ${item.width}`} />
+              return (
+                <article
+                  key={metric.label}
+                  className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-slate-500">
+                      {metric.label}
+                    </p>
+                    <div className="rounded-lg bg-blue-50 p-2 text-blue-700">
+                      <Icon size={19} />
                     </div>
                   </div>
-                ))}
+
+                  <p className="mt-5 text-3xl font-bold text-slate-900">
+                    {metric.value}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {metric.note}
+                  </p>
+                </article>
+              );
+            })}
+          </section>
+
+          <section className="grid gap-5 xl:grid-cols-3">
+            <article className="rounded-xl border border-slate-200 bg-white p-6 xl:col-span-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-slate-900">
+                    Lead pipeline
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Track leads through each sales stage.
+                  </p>
+                </div>
+                <TrendingUp size={20} className="text-slate-400" />
               </div>
+
+              <div className="mt-8 flex min-h-44 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 text-center">
+                <Users size={27} className="text-slate-300" />
+                <p className="mt-3 text-sm font-medium text-slate-600">
+                  No pipeline data available yet
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Lead analytics will appear here when data is connected.
+                </p>
+              </div>
+            </article>
+
+            <article className="rounded-xl border border-slate-200 bg-white p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-slate-900">
+                    Conversion rate
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Lead-to-customer performance
+                  </p>
+                </div>
+                <ArrowUpRight size={20} className="text-slate-400" />
+              </div>
+
+              <div className="mt-8 flex min-h-44 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 text-center">
+                <TrendingUp size={27} className="text-slate-300" />
+                <p className="mt-3 text-2xl font-bold text-slate-400">--</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Waiting for dashboard data
+                </p>
+              </div>
+            </article>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-slate-900">
+                  Recent leads
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Your latest customer opportunities.
+                </p>
+              </div>
+              <Clock3 size={20} className="text-slate-400" />
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-4">
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-sm text-slate-500">Win rate</p>
-                <p className="mt-2 text-2xl font-bold text-slate-900">68%</p>
-              </div>
-              <div className="rounded-2xl bg-emerald-50 p-4">
-                <p className="text-sm text-emerald-700">Forecast</p>
-                <p className="mt-2 text-2xl font-bold text-emerald-900">94%</p>
-              </div>
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full min-w-[600px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">
+                    <th className="pb-3 font-medium">Lead</th>
+                    <th className="pb-3 font-medium">Source</th>
+                    <th className="pb-3 font-medium">Status</th>
+                    <th className="pb-3 font-medium">Priority</th>
+                    <th className="pb-3 font-medium">Assigned to</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="py-10 text-center text-sm text-slate-400"
+                    >
+                      No leads to display yet. Connect the leads API to see
+                      your customer records here.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-          </div>
+          </section>
         </div>
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }
-

@@ -37,7 +37,14 @@ from typing import Literal
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.modules.ai.service import PROMPT_VERSION, persist_assessment, redact_pii
+from app.core.config import settings
+from app.modules.ai.provider import AIProviderError, analyze_with_openai
+from app.modules.ai.service import (
+    PROMPT_VERSION,
+    build_assessment_prompt,
+    persist_assessment,
+    redact_pii,
+)
 
 logger = logging.getLogger("app.ai.jobs")
 
@@ -85,23 +92,30 @@ Analyzer = Callable[[JobInput], AnalysisResult]
 
 
 def default_analyzer(job: JobInput) -> AnalysisResult:
-    """TODO: wire this to the real LLM analysis (classification + summary + sentiment).
+    """Run the configured conversation analyzer over the already-redacted input."""
+    configured_key = settings.openai_api_key
+    api_key = configured_key.get_secret_value() if configured_key is not None else ""
+    if not api_key.strip():
+        raise AIProviderError("AI conversation analysis is not configured")
 
-    persist_assessment(status="ok") requires summary AND sentiment, which
-    classify_message() alone does not return. Call the conversation-analysis
-    function Dev 5 built, then return AnalysisResult(output=..., model=...,
-    prompt_version=..., status="ok"). On provider or validation failure return
-    status "fallback" or "failed" instead of raising.
-    """
-    raise NotImplementedError("wire default_analyzer to the LLM analysis function")
+    prompt = build_assessment_prompt(job.redacted_messages, pii_values=job.pii_values)
+    output = analyze_with_openai(
+        prompt,
+        api_key=api_key,
+        model=settings.openai_model,
+        timeout_seconds=settings.openai_timeout_seconds,
+    )
+    return AnalysisResult(
+        output=output.model_dump(),
+        model=settings.openai_model,
+        prompt_version=prompt["prompt_version"],
+        status="ok",
+    )
 
 
 def _failed_result() -> AnalysisResult:
     return AnalysisResult(
-        output={},
-        model="unavailable",
-        prompt_version=PROMPT_VERSION,
-        status="failed",
+        output={}, model="unavailable", prompt_version=PROMPT_VERSION, status="failed"
     )
 
 
@@ -189,10 +203,7 @@ def _mark(db: Session, event: ClaimedEvent, status: str, error: str | None) -> N
 
 
 def _finish(
-    session_factory: SessionFactory,
-    event: ClaimedEvent,
-    status: str,
-    error: str | None,
+    session_factory: SessionFactory, event: ClaimedEvent, status: str, error: str | None
 ) -> None:
     with session_factory() as db:
         _set_tenant(db, event.tenant_id)
@@ -232,12 +243,8 @@ def _load(db: Session, event: ClaimedEvent) -> _Loaded | None:
 
     lead = db.execute(
         text(
-            """
-            SELECT name, email, phone, company_name, created_at
-              FROM leads
-             WHERE tenant_id = :t
-               AND id = :l
-            """
+            "SELECT name, email, phone, company_name, created_at "
+            "FROM leads WHERE tenant_id = :t AND id = :l"
         ),
         {"t": t, "l": lead_id},
     ).first()

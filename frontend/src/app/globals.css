@@ -4,7 +4,20 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@theme {
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-navy-900: #0f172a;
+  --color-navy-800: #1e293b;
+  --color-surface: #ffffff;
+  --color-page: #f8fafc;
+}
+
 :root {
+  color-scheme: light;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -48,6 +61,34 @@
     --color-background: var(--background);
     --color-foreground: var(--foreground);
   }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  width: 100%;
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
 }
 
 @theme inline {
@@ -136,5 +177,20 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Reserve room for the fixed mobile menu button so it never covers
+   breadcrumbs, page titles, header badges, or header actions. */
+@media (max-width: 767px) {
+  main > header {
+    padding-right: 4.5rem;
+  }
+
+  /* Allow grid children to shrink on small screens. Without this, content
+     such as the settings section tabs can widen the page and push the fixed
+     menu button outside the visible viewport. */
+  main .grid > * {
+    min-width: 0;
   }
 }
