@@ -1,5 +1,7 @@
-﻿"use client";
+﻿
+"use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -37,15 +39,17 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col bg-white">
-      <div className="flex h-20 items-center gap-3 border-b border-slate-100 px-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 font-bold text-white shadow-sm">
-          S
-        </div>
-        <div>
-          <p className="text-lg font-bold tracking-wide text-slate-900">
-            SYNTRIX
-          </p>
-          <p className="text-xs text-slate-500">AI Sales Assistant</p>
+      {/* Sidebar Logo */}
+      <div className="flex h-20 items-end border-b border-slate-100 px-4">
+        <div className="relative h-16 w-full translate-y-1 overflow-hidden">
+          <Image
+            src="/syntrix-logo.png"
+            alt="SYNTRIX CRM"
+            fill
+            priority
+            sizes="208px"
+            className="object-contain object-center scale-[1.8]"
+          />
         </div>
       </div>
 
@@ -131,7 +135,7 @@ function MobileMenuButton({
         />
         <span
           className={cn(
-            "h-0.5 w-5 origin-center rounded-full bg-current transition-all duration-300 ease-out motion-reduce:transition-none",
+            "h-0.5 w-5 rounded-full bg-current transition-all duration-300 ease-out motion-reduce:transition-none",
             open ? "opacity-0" : "opacity-100"
           )}
         />
@@ -158,8 +162,7 @@ export function Sidebar() {
     setMobileOpen(false);
   }, [pathname]);
 
-  // Close the drawer if the viewport grows to the desktop layout so the
-  // scroll lock is always released.
+  // Close the drawer if the viewport grows to the desktop layout.
   useEffect(() => {
     if (!mobileOpen) return;
 
