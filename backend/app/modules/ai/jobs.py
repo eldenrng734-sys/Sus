@@ -37,11 +37,8 @@ from typing import Literal
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
-from app.modules.ai.provider import AIProviderError, analyze_with_openai
 from app.modules.ai.service import (
     PROMPT_VERSION,
-    build_assessment_prompt,
     persist_assessment,
     redact_pii,
 )
@@ -92,25 +89,15 @@ Analyzer = Callable[[JobInput], AnalysisResult]
 
 
 def default_analyzer(job: JobInput) -> AnalysisResult:
-    """Run the configured conversation analyzer over the already-redacted input."""
-    configured_key = settings.openai_api_key
-    api_key = configured_key.get_secret_value() if configured_key is not None else ""
-    if not api_key.strip():
-        raise AIProviderError("AI conversation analysis is not configured")
+    """Run the configured conversation analyzer over the already-redacted input.
 
-    prompt = build_assessment_prompt(job.redacted_messages, pii_values=job.pii_values)
-    output = analyze_with_openai(
-        prompt,
-        api_key=api_key,
-        model=settings.openai_model,
-        timeout_seconds=settings.openai_timeout_seconds,
-    )
-    return AnalysisResult(
-        output=output.model_dump(),
-        model=settings.openai_model,
-        prompt_version=prompt["prompt_version"],
-        status="ok",
-    )
+    Delegates to get_adapter() so the LLM provider is selected by LLM_PROVIDER.
+    This function exists for backward compatibility; new code should call
+    get_adapter() directly and pass the result to run_forever().
+    """
+    from app.modules.ai.adapter import get_adapter
+
+    return get_adapter()(job)
 
 
 def _failed_result() -> AnalysisResult:

@@ -26,10 +26,13 @@ services:
     environment:
       APP_ENV: ${APP_ENV}
       DATABASE_URL: ${DATABASE_URL}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:-}
       MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-}
+      BACKUP_DATABASE_URL: ${BACKUP_DATABASE_URL:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
-      N8N_SERVICE_SECRET: ${N8N_SERVICE_SECRET:-}
+      SERVICE_HMAC_SECRET: ${SERVICE_HMAC_SECRET:-}
+      N8N_SERVICE_SECRET: ${SERVICE_HMAC_SECRET:-}
       WATCHFILES_FORCE_POLLING: "true"
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
@@ -37,6 +40,27 @@ services:
       FRONTEND_BASE_URL: http://localhost:3000
     ports:
       - "8000:8000"
+    volumes:
+      - ../backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build: ../backend
+    command: python -m app.worker
+    environment:
+      APP_ENV: ${APP_ENV}
+      DATABASE_URL: ${DATABASE_URL}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:-}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-20.0}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-2}
+      AI_REVIEW_CONFIDENCE_THRESHOLD: ${AI_REVIEW_CONFIDENCE_THRESHOLD:-0.6}
     volumes:
       - ../backend:/app
     depends_on:
