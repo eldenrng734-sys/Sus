@@ -15,7 +15,6 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-import app.database.registry  # noqa: F401
 from app.database.base import Base, TimestampMixin, UUIDPkMixin
 
 MEMBERSHIP_COLS = ["tenant_memberships.tenant_id", "tenant_memberships.user_id"]
@@ -128,3 +127,8 @@ class Task(UUIDPkMixin, TimestampMixin, Base):
         Index("ix_tasks_tenant_status_due", "tenant_id", "status", "due_at"),
         Index("ix_tasks_tenant_lead_due", "tenant_id", "lead_id", "due_at"),
     )
+
+
+# Must stay at the bottom: registry imports Task from this module,
+# so Task has to be defined first (avoids a circular import).
+import app.database.registry  # noqa: F401, E402

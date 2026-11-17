@@ -18,6 +18,7 @@ from app.modules.lead_forms.router import router as lead_forms_router
 from app.modules.leads.router import router as leads_router
 from app.modules.messaging.router import router as messaging_router
 from app.modules.notifications.router import router as notifications_router
+from app.modules.tasks.router import router as tasks_router
 from app.modules.teams.router import router as teams_router
 
 logging.basicConfig(level=logging.INFO)
@@ -105,6 +106,7 @@ app.include_router(messaging_router)
 app.include_router(teams_router)
 app.include_router(webhook_router)
 app.include_router(integrations_router)
+app.include_router(tasks_router)
 
 
 @app.exception_handler(AuthError)
