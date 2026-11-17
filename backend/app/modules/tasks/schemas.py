@@ -1,3 +1,4 @@
+
 import uuid
 from datetime import datetime
 from typing import Literal
@@ -42,3 +43,22 @@ class TaskOut(BaseModel):
     lead_id: uuid.UUID | None
     assigned_user_id: uuid.UUID
     created_at: datetime
+
+
+class TaskApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["approved", "rejected"]
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class TaskApprovalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    approval_status: str
+    approved_by_user_id: uuid.UUID | None
+    approved_at: datetime | None
+    rejected_by_user_id: uuid.UUID | None
+    rejected_at: datetime | None
+    approval_note: str | None

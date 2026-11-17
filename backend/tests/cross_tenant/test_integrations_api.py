@@ -83,10 +83,7 @@ def test_admin_connects_integration_credentials_are_write_only(
     # 2. Raw DB check: Ciphertext stored as bytea, no plaintext token in DB row
     with admin_engine.begin() as conn:
         set_tenant(conn, seed.a.id)
-        query = (
-            "SELECT credentials_encrypted, key_version, status "
-            "FROM integrations WHERE id = :id"
-        )
+        query = "SELECT credentials_encrypted, key_version, status FROM integrations WHERE id = :id"
         row = conn.execute(text(query), {"id": integration_id}).fetchone()
 
         assert row is not None
@@ -220,9 +217,9 @@ def test_meta_connect_subscribes_page_to_leadgen_and_messages(
 ):
     page_id = str(uuid.uuid4().int)[:15]
     headers = _headers(tokens, seed, "a", "admin")
-    route = mock_meta_graph.post(
-        path__regex=rf"^/v\d+\.\d+/{page_id}/subscribed_apps$"
-    ).respond(200, json={"success": True})
+    route = mock_meta_graph.post(path__regex=rf"^/v\d+\.\d+/{page_id}/subscribed_apps$").respond(
+        200, json={"success": True}
+    )
 
     resp = api_client.post(
         "/api/v1/integrations/meta/connect",
@@ -238,9 +235,7 @@ def test_meta_connect_subscribes_page_to_leadgen_and_messages(
     assert resp.json()["data"]["provider"] == "meta"
     assert "page-token-meta" not in resp.text
 
-    validation_call = next(
-        call for call in mock_meta_graph.calls if call.request.method == "GET"
-    )
+    validation_call = next(call for call in mock_meta_graph.calls if call.request.method == "GET")
     assert validation_call.request.headers["authorization"] == "Bearer page-token-meta"
     assert "access_token" not in str(validation_call.request.url)
 

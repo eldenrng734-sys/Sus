@@ -145,6 +145,54 @@ export default function LeadsPage() {
               Lead Management
             </h1>
           </div>
+          <Link
+            href="/leads/new"
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Create lead
+          </Link>
+        </div>
+
+        <div className="mb-6 grid gap-3 rounded-lg border bg-white p-4 md:grid-cols-2 lg:grid-cols-4">
+          <input
+            type="search"
+            placeholder="Search name, email, phone or company..."
+            value={search}
+            onChange={(e) => changeSearch(e.target.value)}
+            maxLength={100}
+            className="rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
+          <select
+            value={status}
+            onChange={(e) => changeStatus(e.target.value)}
+            className="rounded-md border px-3 py-2 text-sm"
+          >
+            <option value="">All statuses</option>
+            {statuses.map((item) => (
+              <option key={item} value={item}>
+                {formatOption(item)}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={priority}
+            onChange={(e) => changePriority(e.target.value)}
+            className="rounded-md border px-3 py-2 text-sm"
+          >
+            <option value="">All priorities</option>
+            {priorities.map((item) => (
+              <option key={item} value={item}>
+                {formatOption(item)}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={source}
+            onChange={(e) => changeSource(e.target.value)}
+            className="rounded-md border px-3 py-2 text-sm"
           <div
             aria-hidden="true"
             className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700"
@@ -299,6 +347,31 @@ export default function LeadsPage() {
                     <th className="px-5 py-4 font-medium">Assigned to</th>
                   </tr>
                 </thead>
+
+                <tbody className="divide-y">
+                  {leads.map((lead) => (
+                    <tr key={lead.id} className="hover:bg-gray-50">
+                      <td className="p-4 font-medium text-gray-900">
+                        <Link className="hover:underline" href={`/leads/${lead.id}`}>
+                          {lead.name}
+                        </Link>
+                      </td>
+                      <td className="p-4">
+                        {lead.company_name || "-"}
+                      </td>
+                      <td className="p-4">
+                        {lead.email || "-"}
+                      </td>
+                      <td className="p-4">
+                        {lead.phone || "-"}
+                      </td>
+                      <td className="p-4">
+                        {formatOption(lead.source)}
+                      </td>
+                      <td className="p-4">
+                        <span className="rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700">
+                          {lead.status}
+                        </span>
                 <tbody className="divide-y divide-slate-100">
                   {!loading &&
                     !error &&

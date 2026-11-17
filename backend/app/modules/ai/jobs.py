@@ -115,6 +115,10 @@ def default_analyzer(job: JobInput) -> AnalysisResult:
 
 def _failed_result() -> AnalysisResult:
     return AnalysisResult(
+        output={},
+        model="unavailable",
+        prompt_version=PROMPT_VERSION,
+        status="failed",
         output={}, model="unavailable", prompt_version=PROMPT_VERSION, status="failed"
     )
 
@@ -150,7 +154,10 @@ def worker_id() -> str:
 
 
 def claim_batch(
-    session_factory: SessionFactory, *, limit: int = BATCH_SIZE, worker: str | None = None
+    session_factory: SessionFactory,
+    *,
+    limit: int = BATCH_SIZE,
+    worker: str | None = None,
 ) -> list[ClaimedEvent]:
     """Claim a bounded batch in one short transaction.
 
@@ -176,7 +183,10 @@ def claim_batch(
 
 def _set_tenant(db: Session, tenant_id: uuid.UUID) -> None:
     """Transaction-local tenant context. Must be re-run after every commit."""
-    db.execute(text("SELECT set_config('app.tenant_id', :t, true)"), {"t": str(tenant_id)})
+    db.execute(
+        text("SELECT set_config('app.tenant_id', :t, true)"),
+        {"t": str(tenant_id)},
+    )
 
 
 def _mark(db: Session, event: ClaimedEvent, status: str, error: str | None) -> None:
@@ -194,6 +204,10 @@ def _mark(db: Session, event: ClaimedEvent, status: str, error: str | None) -> N
 
 
 def _finish(
+    session_factory: SessionFactory,
+    event: ClaimedEvent,
+    status: str,
+    error: str | None,
     session_factory: SessionFactory, event: ClaimedEvent, status: str, error: str | None
 ) -> None:
     with session_factory() as db:
@@ -234,6 +248,12 @@ def _load(db: Session, event: ClaimedEvent) -> _Loaded | None:
 
     lead = db.execute(
         text(
+            """
+            SELECT name, email, phone, company_name, created_at
+              FROM leads
+             WHERE tenant_id = :t
+               AND id = :l
+            """
             "SELECT name, email, phone, company_name, created_at "
             "FROM leads WHERE tenant_id = :t AND id = :l"
         ),
@@ -307,15 +327,26 @@ def _run_analyzer(analyzer: Analyzer, job: JobInput) -> AnalysisResult:
     except NotImplementedError:
         raise  # a wiring mistake, not an LLM failure: retry, then dead, never hide it
     except Exception as exc:
-        logger.warning("analyzer_failed lead=%s error=%s", job.lead_id, type(exc).__name__)
+        logger.warning(
+            "analyzer_failed lead=%s error=%s",
+            job.lead_id,
+            type(exc).__name__,
+        )
         return _failed_result()
-    if not isinstance(result, AnalysisResult) or result.status not in ("ok", "fallback", "failed"):
+    if not isinstance(result, AnalysisResult) or result.status not in (
+        "ok",
+        "fallback",
+        "failed",
+    ):
         return _failed_result()
     return result
 
 
 def _persist_and_mark(
-    session_factory: SessionFactory, event: ClaimedEvent, job: JobInput, result: AnalysisResult
+    session_factory: SessionFactory,
+    event: ClaimedEvent,
+    job: JobInput,
+    result: AnalysisResult,
 ) -> None:
     """Assessment + 'processed' commit together, so a crash cannot leave a duplicate window."""
     with session_factory() as db:
@@ -335,7 +366,11 @@ def _persist_and_mark(
         db.commit()
 
 
-def _fail_or_retry(session_factory: SessionFactory, event: ClaimedEvent, exc: Exception) -> None:
+def _fail_or_retry(
+    session_factory: SessionFactory,
+    event: ClaimedEvent,
+    exc: Exception,
+) -> None:
     code = type(exc).__name__  # class name only: never put message text in last_error
     if event.attempts >= MAX_ATTEMPTS:
         _finish(session_factory, event, "dead", code)
@@ -362,7 +397,9 @@ def _fail_or_retry(session_factory: SessionFactory, event: ClaimedEvent, exc: Ex
 
 
 def process_event(
-    session_factory: SessionFactory, event: ClaimedEvent, analyzer: Analyzer = default_analyzer
+    session_factory: SessionFactory,
+    event: ClaimedEvent,
+    analyzer: Analyzer = default_analyzer,
 ) -> str:
     """Handle one claimed event. Returns: ok | fallback | failed | skipped | dead | error."""
     if event.attempts > MAX_ATTEMPTS:  # e.g. a worker that keeps crashing mid-job
@@ -394,7 +431,11 @@ def process_event(
         try:
             _fail_or_retry(session_factory, event, exc)
         except Exception as inner:  # DB down: the lease will let another run reclaim it
-            logger.error("job_retry_failed event=%s error=%s", event.id, type(inner).__name__)
+            logger.error(
+                "job_retry_failed event=%s error=%s",
+                event.id,
+                type(inner).__name__,
+            )
         return "error"
 
 

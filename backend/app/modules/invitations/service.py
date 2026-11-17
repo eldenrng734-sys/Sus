@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -6,11 +7,15 @@ from sqlalchemy.orm import Session
 
 from app.core.security import generate_refresh_token, hash_password, hash_refresh_token
 from app.database.session import set_tenant_context
+from app.modules.auth.emails import send_invitation_email
 from app.modules.auth.errors import AuthError
+from app.modules.auth.sessions import revoke_all_for_user
 from app.modules.invitations.models import Invitation
 from app.modules.invitations.schemas import AcceptRequest, InviteRequest
 from app.modules.tenants.models import TenantMembership
 from app.modules.users.models import User
+
+logger = logging.getLogger(__name__)
 
 INVITE_EXPIRE_DAYS = 7
 
@@ -65,14 +70,19 @@ def create_invitation(session: Session, admin: TenantMembership, body: InviteReq
     )
     session.add(invitation)
     session.commit()
-    # TODO: send raw_token by email (Mailpit). For now it is returned so we can test.
+
+    try:
+        send_invitation_email(invitation.email, raw_token)
+    except Exception:  # the invitation is saved; do not crash if SMTP is down
+        logger.warning("invitation_email_failed invitation_id=%s", invitation.id)
+
     return {
         "id": str(invitation.id),
         "email": invitation.email,
         "role": invitation.role,
         "status": invitation.status,
         "expires_at": invitation.expires_at.isoformat(),
-        "invite_token": raw_token,
+        "invite_token": raw_token,  # TODO: remove once email works (security)
     }
 
 
@@ -149,6 +159,7 @@ def deactivate_membership(
 ) -> dict:
     member = _get_member(session, admin, membership_id)
     member.is_active = False
+    revoke_all_for_user(session, member.user_id)  # log them out everywhere
     session.commit()
     return {"id": str(member.id), "is_active": member.is_active}
 
@@ -161,5 +172,6 @@ def change_role(
 ) -> dict:
     member = _get_member(session, admin, membership_id)
     member.role = role
+    revoke_all_for_user(session, member.user_id)  # old tokens must not keep the old role
     session.commit()
     return {"id": str(member.id), "role": member.role}

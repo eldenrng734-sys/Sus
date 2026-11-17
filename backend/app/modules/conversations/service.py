@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Sequence
 
 from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.permissions import apply_data_scope
 from app.core.tenancy import TenantContext
+from app.database.session import set_tenant_context
 from app.modules.ai.models import LeadAssessment
 from app.modules.ai.provider import AIProviderError, analyze_with_openai
 from app.modules.ai.service import (
@@ -199,3 +201,134 @@ def get_timeline(
         )
     events.sort(key=lambda e: e.at, reverse=True)
     return events[offset : offset + limit]
+
+
+def _bounded_conversation(messages: Sequence[str]) -> list[str]:
+    """Keep the newest messages within provider input limits."""
+    bounded: list[str] = []
+    total_chars = 0
+    for message in reversed(messages):
+        if not message:
+            continue
+        message = message[-4000:]
+        remaining = 20_000 - total_chars
+        if remaining <= 0:
+            break
+        if len(message) > remaining:
+            message = message[-remaining:]
+        bounded.append(message)
+        total_chars += len(message)
+        if len(bounded) == 100:
+            break
+    return list(reversed(bounded))
+
+
+def analyze_conversation(
+    session: Session,
+    context: TenantContext,
+    conversation_id: uuid.UUID,
+) -> ConversationAnalysisOut:
+    conversation = _get_conversation(session, context, conversation_id)
+    lead = _get_lead(session, context, conversation.lead_id)
+
+    messages = list(
+        session.scalars(
+            select(Message)
+            .where(
+                Message.tenant_id == context.tenant_id,
+                Message.conversation_id == conversation_id,
+            )
+            .order_by(Message.created_at.desc())
+            .limit(100)
+        )
+    )
+    messages.reverse()
+    has_customer_message = any(
+        message.direction == "inbound" and message.message_text for message in messages
+    )
+    if not has_customer_message:
+        raise AuthError(422, "validation_error", "Conversation has no inbound messages")
+    conversation_messages = [
+        f"{'Customer' if message.direction == 'inbound' else 'Agent'}: {message.message_text}"
+        for message in messages
+        if message.direction in {"inbound", "outbound"} and message.message_text
+    ]
+
+    configured_key = settings.openai_api_key
+    api_key = configured_key.get_secret_value() if configured_key is not None else ""
+    if not api_key.strip():
+        raise AuthError(503, "service_unavailable", "Conversation analysis is not configured")
+
+    pii_values = [
+        value
+        for value in (
+            lead.name,
+            lead.email,
+            lead.phone,
+            getattr(lead, "company_name", None),
+        )
+        if value
+    ]
+    prompt = build_assessment_prompt(
+        _bounded_conversation(conversation_messages),
+        pii_values=pii_values,
+    )
+
+    session.commit()
+    model = settings.openai_model
+    try:
+        output = analyze_with_openai(
+            prompt,
+            api_key=api_key,
+            model=model,
+            timeout_seconds=settings.openai_timeout_seconds,
+        )
+    except AIProviderError as exc:
+        set_tenant_context(session, str(context.tenant_id))
+        persist_assessment(
+            session,
+            tenant_id=context.tenant_id,
+            lead_id=lead.id,
+            conversation_id=conversation.id,
+            output={},
+            model=model,
+            prompt_version=PROMPT_VERSION,
+            pii_values=pii_values,
+            status="failed",
+        )
+        session.commit()
+        raise AuthError(502, "provider_error", "Conversation analysis failed") from exc
+
+    set_tenant_context(session, str(context.tenant_id))
+    assessment = persist_assessment(
+        session,
+        tenant_id=context.tenant_id,
+        lead_id=lead.id,
+        conversation_id=conversation.id,
+        output=output,
+        model=model,
+        prompt_version=prompt["prompt_version"],
+        pii_values=pii_values,
+    )
+    session.commit()
+    return ConversationAnalysisOut.model_validate(assessment)
+
+
+def get_conversation_analysis(
+    session: Session,
+    context: TenantContext,
+    conversation_id: uuid.UUID,
+) -> ConversationAnalysisOut:
+    _get_conversation(session, context, conversation_id)
+    assessment = session.scalar(
+        select(LeadAssessment)
+        .where(
+            LeadAssessment.tenant_id == context.tenant_id,
+            LeadAssessment.conversation_id == conversation_id,
+        )
+        .order_by(LeadAssessment.created_at.desc())
+        .limit(1)
+    )
+    if assessment is None:
+        raise AuthError(404, "not_found", "Conversation analysis not found")
+    return ConversationAnalysisOut.model_validate(assessment)
