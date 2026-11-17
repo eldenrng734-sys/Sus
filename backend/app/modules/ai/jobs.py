@@ -119,7 +119,6 @@ def _failed_result() -> AnalysisResult:
         model="unavailable",
         prompt_version=PROMPT_VERSION,
         status="failed",
-        output={}, model="unavailable", prompt_version=PROMPT_VERSION, status="failed"
     )
 
 
@@ -208,7 +207,6 @@ def _finish(
     event: ClaimedEvent,
     status: str,
     error: str | None,
-    session_factory: SessionFactory, event: ClaimedEvent, status: str, error: str | None
 ) -> None:
     with session_factory() as db:
         _set_tenant(db, event.tenant_id)
@@ -254,8 +252,6 @@ def _load(db: Session, event: ClaimedEvent) -> _Loaded | None:
              WHERE tenant_id = :t
                AND id = :l
             """
-            "SELECT name, email, phone, company_name, created_at "
-            "FROM leads WHERE tenant_id = :t AND id = :l"
         ),
         {"t": t, "l": lead_id},
     ).first()
