@@ -17,7 +17,6 @@ from app.modules.ai.service import (
 from app.modules.auth.errors import AuthError
 from app.modules.conversations.models import Conversation, Message
 from app.modules.conversations.schemas import (
-    ConversationAnalysisOut,
     ConversationCreate,
     ConversationOut,
     MessageOut,
