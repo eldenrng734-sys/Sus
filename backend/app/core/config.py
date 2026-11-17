@@ -56,7 +56,7 @@ class Settings(BaseSettings):
 
     llm_api_key: str = ""
     llm_model: str = ""
-    llm_base_url: str = "https://openrouter.ai/api/v1"
+    llm_base_url: str = "https://api.anthropic.com/v1/messages"
     llm_timeout_seconds: float = 20.0
     llm_max_retries: int = 2
     llm_input_price_per_mtok: float = 0.0
