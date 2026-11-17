@@ -17,13 +17,7 @@ router = APIRouter(prefix="/api/v1/tasks", tags=["tasks"])
 def review_task(
     task_id: uuid.UUID,
     body: TaskApprovalRequest,
-    context: Annotated[
-        TenantContext, Depends(require_manager_or_admin)
-    ],
+    context: Annotated[TenantContext, Depends(require_manager_or_admin)],
     session: Session = Depends(get_session),
 ) -> dict:
-    return {
-        "data": service.review_task_approval(
-            session, context, task_id, body
-        )
-    }
+    return {"data": service.review_task_approval(session, context, task_id, body)}
