@@ -5,17 +5,12 @@ from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.permissions import apply_data_scope
 from app.core.tenancy import TenantContext
 from app.database.session import set_tenant_context
+from app.modules.ai.adapter import get_adapter
 from app.modules.ai.models import LeadAssessment
-from app.modules.ai.provider import AIProviderError, analyze_with_openai
-from app.modules.ai.service import (
-    PROMPT_VERSION,
-    build_assessment_prompt,
-    persist_assessment,
-)
+from app.modules.ai.service import persist_assessment
 from app.modules.auth.errors import AuthError
 from app.modules.conversations.models import Conversation, Message
 from app.modules.conversations.schemas import (
@@ -100,7 +95,11 @@ def list_conversations(
     limit: int,
     offset: int,
 ) -> list[ConversationOut]:
-    stmt = _conversation_query(context)
+    stmt = select(Conversation, Lead).join(
+        Lead,
+        and_(Lead.tenant_id == Conversation.tenant_id, Lead.id == Conversation.lead_id),
+    )
+    stmt = apply_data_scope(stmt, Lead, context)
     if lead_id:
         stmt = stmt.where(Conversation.lead_id == lead_id)
     if status:
@@ -113,7 +112,35 @@ def list_conversations(
         .limit(limit)
         .offset(offset)
     )
-    return [ConversationOut.model_validate(c) for c in session.scalars(stmt)]
+    results: list[ConversationOut] = []
+    for conv, lead in session.execute(stmt).all():
+        out = ConversationOut.model_validate(conv)
+        out.lead_name = lead.name
+        out.lead_phone = lead.phone
+        out.lead_opted_out = lead.opted_out
+        results.append(out)
+    return results
+
+
+def get_conversation_detail(
+    session: Session,
+    context: TenantContext,
+    conversation_id: uuid.UUID,
+) -> ConversationOut:
+    stmt = select(Conversation, Lead).join(
+        Lead,
+        and_(Lead.tenant_id == Conversation.tenant_id, Lead.id == Conversation.lead_id),
+    ).where(Conversation.id == conversation_id)
+    stmt = apply_data_scope(stmt, Lead, context)
+    row = session.execute(stmt).first()
+    if row is None:
+        raise AuthError(404, "not_found", "Conversation not found")
+    conv, lead = row
+    out = ConversationOut.model_validate(conv)
+    out.lead_name = lead.name
+    out.lead_phone = lead.phone
+    out.lead_opted_out = lead.opted_out
+    return out
 
 
 def list_messages(
@@ -254,11 +281,6 @@ def analyze_conversation(
         if message.direction in {"inbound", "outbound"} and message.message_text
     ]
 
-    configured_key = settings.openai_api_key
-    api_key = configured_key.get_secret_value() if configured_key is not None else ""
-    if not api_key.strip():
-        raise AuthError(503, "service_unavailable", "Conversation analysis is not configured")
-
     pii_values = [
         value
         for value in (
@@ -269,35 +291,22 @@ def analyze_conversation(
         )
         if value
     ]
-    prompt = build_assessment_prompt(
-        _bounded_conversation(conversation_messages),
+
+    from app.modules.ai.jobs import AnalysisResult, JobInput
+
+    job = JobInput(
+        tenant_id=context.tenant_id,
+        lead_id=lead.id,
+        conversation_id=conversation.id,
+        redacted_messages=_bounded_conversation(conversation_messages),
         pii_values=pii_values,
     )
 
+    # Commit the read transaction BEFORE calling the adapter (no DB lock during LLM call).
     session.commit()
-    model = settings.openai_model
-    try:
-        output = analyze_with_openai(
-            prompt,
-            api_key=api_key,
-            model=model,
-            timeout_seconds=settings.openai_timeout_seconds,
-        )
-    except AIProviderError as exc:
-        set_tenant_context(session, str(context.tenant_id))
-        persist_assessment(
-            session,
-            tenant_id=context.tenant_id,
-            lead_id=lead.id,
-            conversation_id=conversation.id,
-            output={},
-            model=model,
-            prompt_version=PROMPT_VERSION,
-            pii_values=pii_values,
-            status="failed",
-        )
-        session.commit()
-        raise AuthError(502, "provider_error", "Conversation analysis failed") from exc
+
+    adapter = get_adapter()
+    result: AnalysisResult = adapter(job)
 
     set_tenant_context(session, str(context.tenant_id))
     assessment = persist_assessment(
@@ -305,11 +314,15 @@ def analyze_conversation(
         tenant_id=context.tenant_id,
         lead_id=lead.id,
         conversation_id=conversation.id,
-        output=output,
-        model=model,
-        prompt_version=prompt["prompt_version"],
+        output=result.output,
+        model=result.model,
+        prompt_version=result.prompt_version,
         pii_values=pii_values,
+        status=result.status,
     )
+    if result.status == "failed":
+        session.commit()
+        raise AuthError(502, "provider_error", "Conversation analysis failed")
     session.commit()
     return ConversationAnalysisOut.model_validate(assessment)
 

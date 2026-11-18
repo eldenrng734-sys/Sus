@@ -2,7 +2,7 @@ import unicodedata
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select, text, update
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.modules.audit.service import record_audit_event
@@ -69,7 +69,6 @@ def apply_opt_out(
         return False
 
     import app.database.registry  # noqa: F401
-    from app.modules.tasks.models import Task
 
     try:
         lead.opted_out = True
@@ -78,26 +77,12 @@ def apply_opt_out(
         lead.version += 1
 
         # Cancel open automated follow-up tasks if the table exists
-        has_tasks = session.execute(
-            text("SELECT to_regclass('public.tasks')")
-        ).scalar() is not None
+        has_tasks = session.execute(text("SELECT to_regclass('public.tasks')")).scalar() is not None
 
         if has_tasks:
-            session.execute(
-                update(Task)
-                .where(
-                    Task.tenant_id == lead.tenant_id,
-                    Task.lead_id == lead.id,
-                    Task.type == "follow_up",
-                    Task.created_by == "automation",
-                    Task.status == "open",
-                )
-                .values(
-                    status="cancelled",
-                    version=Task.version + 1,
-                    updated_at=func.now(),
-                )
-            )
+            from app.modules.tasks.service import cancel_followups
+
+            cancel_followups(session, lead.id, reason="opt_out")
 
         session.add(
             Interaction(

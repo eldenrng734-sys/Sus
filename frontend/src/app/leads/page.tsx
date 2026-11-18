@@ -2,9 +2,22 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, UserPlus } from "lucide-react";
+import {
+  Plus,
+  Search,
+  UserPlus,
+  Upload,
+  FileSpreadsheet,
+  X,
+} from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
+import { useAuth } from "@/providers/auth-provider";
 import { fetchLeads } from "@/lib/leads-api";
+import { useImportCsv } from "@/hooks/use-leads";
+import type { CsvImportResult } from "@/lib/api/leads";
+import { parseApiError } from "@/lib/api-error";
+import { ErrorBanner } from "@/components/shared/error-banner";
+import { LoadingSpinner } from "@/components/shared/loading-spinner";
 
 type Lead = {
   id: string;
@@ -52,6 +65,9 @@ function formatOption(value: string) {
 }
 
 export default function LeadsPage() {
+  const { role } = useAuth();
+  const isManagerOrAdmin = role === "manager" || role === "admin";
+
   const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -64,6 +80,16 @@ export default function LeadsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // CSV Import Modal state
+  const [showCsvModal, setShowCsvModal] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [dryRun, setDryRun] = useState(false);
+  const [csvResult, setCsvResult] = useState<CsvImportResult | null>(null);
+  const [csvError, setCsvError] = useState<{ title: string; message: string } | null>(null);
+
+  const importCsvMutation = useImportCsv();
 
   useEffect(() => {
     let cancelled = false;
@@ -93,7 +119,7 @@ export default function LeadsPage() {
           setError(
             requestError instanceof Error
               ? requestError.message
-              : "Could not load leads.",
+              : "Could not load leads."
           );
           setLeads([]);
           setNextCursor(null);
@@ -108,7 +134,7 @@ export default function LeadsPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [search, status, priority, source, owner, cursor]);
+  }, [search, status, priority, source, owner, cursor, refreshTrigger]);
 
   function resetPagination() {
     setCursor(null);
@@ -127,6 +153,36 @@ export default function LeadsPage() {
     setCursorStack((stack) => stack.slice(0, -1));
     setCursor(previousCursor);
   }
+
+  const handleCsvSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!csvFile) return;
+
+    setCsvError(null);
+    setCsvResult(null);
+
+    try {
+      const res = await importCsvMutation.mutateAsync({
+        file: csvFile,
+        dryRun,
+      });
+      setCsvResult(res);
+      if (!dryRun) {
+        setRefreshTrigger((prev) => prev + 1);
+      }
+    } catch (err) {
+      const parsed = parseApiError(err);
+      setCsvError({ title: parsed.title, message: parsed.message });
+    }
+  };
+
+  const handleCloseCsvModal = () => {
+    setShowCsvModal(false);
+    setCsvFile(null);
+    setCsvResult(null);
+    setCsvError(null);
+    setDryRun(false);
+  };
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -158,16 +214,30 @@ export default function LeadsPage() {
             <div>
               <h2 className="text-2xl font-bold text-slate-900">Leads</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Manage and track your potential customers.
+                Manage, import, and track your potential customers.
               </p>
             </div>
-            <Link
-              href="/leads/new"
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
-            >
-              <Plus size={18} />
-              Add New Lead
-            </Link>
+
+            <div className="flex items-center gap-3">
+              {/* CSV Import Button (Manager/Admin only) */}
+              {isManagerOrAdmin && (
+                <button
+                  onClick={() => setShowCsvModal(true)}
+                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                >
+                  <Upload size={17} />
+                  Import CSV
+                </button>
+              )}
+
+              <Link
+                href="/leads/new"
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 shadow-sm"
+              >
+                <Plus size={18} />
+                Add New Lead
+              </Link>
+            </div>
           </section>
 
           <section className="grid gap-4 sm:grid-cols-3">
@@ -184,9 +254,9 @@ export default function LeadsPage() {
             ].map((metric) => (
               <article
                 key={metric.label}
-                className="rounded-xl border border-slate-200 bg-white p-5"
+                className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
               >
-                <p className="text-sm text-slate-500">{metric.label}</p>
+                <p className="text-sm font-medium text-slate-500">{metric.label}</p>
                 <p className="mt-3 text-2xl font-bold text-slate-900">
                   {loading ? "--" : metric.value}
                 </p>
@@ -194,7 +264,7 @@ export default function LeadsPage() {
             ))}
           </section>
 
-          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 p-5">
               <h3 className="font-semibold text-slate-900">All Leads</h3>
               <p className="mt-1 text-xs text-slate-500">
@@ -303,7 +373,7 @@ export default function LeadsPage() {
                   {!loading &&
                     !error &&
                     leads.map((lead) => (
-                      <tr key={lead.id} className="hover:bg-slate-50">
+                      <tr key={lead.id} className="hover:bg-slate-50 transition">
                         <td className="px-5 py-4">
                           <Link
                             href={`/leads/${lead.id}`}
@@ -407,6 +477,182 @@ export default function LeadsPage() {
           )}
         </div>
       </main>
+
+      {/* CSV Import Modal */}
+      {showCsvModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet size={20} className="text-blue-600" />
+                <h3 className="text-base font-bold text-slate-900">
+                  Import Leads from CSV
+                </h3>
+              </div>
+              <button
+                onClick={handleCloseCsvModal}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Error display */}
+            {csvError && (
+              <div className="mt-4">
+                <ErrorBanner
+                  title={csvError.title}
+                  message={csvError.message}
+                  onDismiss={() => setCsvError(null)}
+                />
+              </div>
+            )}
+
+            {/* Import Results Display */}
+            {csvResult ? (
+              <div className="mt-4 space-y-4">
+                <div
+                  className={`rounded-xl border p-4 ${
+                    csvResult.error_count > 0
+                      ? "border-amber-200 bg-amber-50/60"
+                      : "border-green-200 bg-green-50/60"
+                  }`}
+                >
+                  <p className="font-semibold text-slate-900">
+                    {csvResult.dry_run
+                      ? "Dry Run Completed (No changes saved)"
+                      : "CSV Import Completed"}
+                  </p>
+                  <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+                    <div className="rounded-lg bg-white p-2 shadow-xs">
+                      <p className="text-xs text-slate-500">Total Rows</p>
+                      <p className="text-base font-bold text-slate-900">
+                        {csvResult.total_rows}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-white p-2 shadow-xs">
+                      <p className="text-xs text-green-700">Created</p>
+                      <p className="text-base font-bold text-green-700">
+                        {csvResult.created_count}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-white p-2 shadow-xs">
+                      <p className="text-xs text-amber-700">Duplicates</p>
+                      <p className="text-base font-bold text-amber-700">
+                        {csvResult.duplicate_count}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-white p-2 shadow-xs">
+                      <p className="text-xs text-red-700">Errors</p>
+                      <p className="text-base font-bold text-red-700">
+                        {csvResult.error_count}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row-level errors and duplicates breakdown */}
+                {csvResult.errors.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-700 mb-2">
+                      Row Details & Validation Issues:
+                    </p>
+                    <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2 space-y-1.5 text-xs">
+                      {csvResult.errors.map((err, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-2 rounded-lg bg-white p-2 shadow-2xs"
+                        >
+                          <span
+                            className={`rounded px-1.5 py-0.5 font-bold ${
+                              err.code === "duplicate_lead"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            Row {err.row}
+                          </span>
+                          <span className="text-slate-700 flex-1">
+                            {err.message}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={handleCloseCsvModal}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Upload Form */
+              <form onSubmit={handleCsvSubmit} className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Upload CSV File
+                  </label>
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    required
+                    onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
+                    className="w-full text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                  <p className="mt-1 text-xs text-slate-400">
+                    File must include a &apos;name&apos; column and either
+                    &apos;email&apos; or &apos;phone&apos;. Max 10 MB / 10,000 rows.
+                  </p>
+                </div>
+
+                <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={dryRun}
+                    onChange={(e) => setDryRun(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>
+                    Dry Run — Validate file without creating leads in database
+                  </span>
+                </label>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleCloseCsvModal}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={importCsvMutation.isPending || !csvFile}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {importCsvMutation.isPending ? (
+                      <>
+                        <LoadingSpinner size="sm" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={14} />
+                        {dryRun ? "Test CSV (Dry Run)" : "Start Import"}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

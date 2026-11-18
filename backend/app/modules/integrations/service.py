@@ -179,7 +179,9 @@ def list_integrations(
             select(Integration)
             .where(Integration.tenant_id == context.tenant_id)
             .order_by(Integration.created_at.desc())
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
 
@@ -268,12 +270,13 @@ def get_credentials(
 
 def os_env_wa_token() -> str:
     import os
+
     return os.environ.get("WHATSAPP_ACCESS_TOKEN", "") or os.environ.get("TEST_WA_TOKEN", "")
 
 
 def os_env_wa_phone() -> str:
     import os
-    return (
-        os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
-        or os.environ.get("TEST_WA_PHONE_NUMBER_ID", "")
+
+    return os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "") or os.environ.get(
+        "TEST_WA_PHONE_NUMBER_ID", ""
     )

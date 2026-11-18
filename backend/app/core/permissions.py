@@ -49,6 +49,9 @@ def require_platform_admin(
     # Sets only the authenticated user context, not a tenant context.
     tenancy._check_user_and_session(session, user_id, session_id, amr)
 
+    if "totp" not in amr:
+        raise AuthError(403, "mfa_required", "Complete MFA before accessing platform admin")
+
     user = session.get(User, user_id)
     if user is None or not user.is_platform_admin:
         raise AuthError(403, "forbidden", "Platform admin access required")

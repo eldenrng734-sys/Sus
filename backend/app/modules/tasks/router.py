@@ -1,8 +1,7 @@
-
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_any_member, require_manager_or_admin
@@ -26,19 +25,37 @@ def get_tasks(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> dict:
-    tasks = service.list_tasks(
-        session, context, limit=limit, offset=offset
-    )
+    tasks = service.list_tasks(session, context, limit=limit, offset=offset)
+    return {"data": [TaskOut.model_validate(task) for task in tasks]}
+
+
+# IMPORTANT: declared BEFORE /{task_id} so FastAPI does not try to parse
+# the literal segment "due-follow-ups" as a UUID.
+@router.get("/due-follow-ups")
+def get_due_follow_ups(
+    context: Annotated[TenantContext, Depends(require_any_member)],
+    session: Session = Depends(get_session),
+    due_before: str | None = Query(
+        default=None,
+        description="ISO-8601 datetime; defaults to now when omitted",
+    ),
+    limit: int = Query(default=50, ge=1, le=100),
+) -> dict:
+    tasks = service.list_due_follow_ups(session, context, due_before=due_before, limit=limit)
     return {"data": [TaskOut.model_validate(task) for task in tasks]}
 
 
 @router.post("", status_code=201)
 def post_task(
     body: TaskCreate,
+    response: Response,
     context: Annotated[TenantContext, Depends(require_any_member)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
     session: Session = Depends(get_session),
 ) -> dict:
-    task = service.create_task(session, context, body)
+    task, is_replay = service.create_task(session, context, body, idempotency_key)
+    if is_replay:
+        response.headers["Idempotent-Replay"] = "true"
     return {"data": TaskOut.model_validate(task)}
 
 
@@ -49,10 +66,29 @@ def get_approval_queue(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> dict:
-    tasks = service.list_approval_queue(
-        session, context, limit=limit, offset=offset
-    )
+    tasks = service.list_approval_queue(session, context, limit=limit, offset=offset)
     return {"data": [TaskOut.model_validate(task) for task in tasks]}
+
+
+@router.get("/{task_id}")
+def get_task_detail(
+    task_id: uuid.UUID,
+    context: Annotated[TenantContext, Depends(require_any_member)],
+    session: Session = Depends(get_session),
+) -> dict:
+    task = service.get_task(session, context, task_id)
+    return {"data": TaskOut.model_validate(task)}
+
+
+@router.patch("/{task_id}")
+def patch_task(
+    task_id: uuid.UUID,
+    body: TaskUpdate,
+    context: Annotated[TenantContext, Depends(require_any_member)],
+    session: Session = Depends(get_session),
+) -> dict:
+    task = service.update_task(session, context, task_id, body)
+    return {"data": TaskOut.model_validate(task)}
 
 
 @router.post("/{task_id}/approve")
@@ -86,25 +122,4 @@ def reject_task(
         approved=False,
         note=body.note,
     )
-    return {"data": TaskOut.model_validate(task)}
-
-
-@router.get("/{task_id}")
-def get_task_detail(
-    task_id: uuid.UUID,
-    context: Annotated[TenantContext, Depends(require_any_member)],
-    session: Session = Depends(get_session),
-) -> dict:
-    task = service.get_task(session, context, task_id)
-    return {"data": TaskOut.model_validate(task)}
-
-
-@router.patch("/{task_id}")
-def patch_task(
-    task_id: uuid.UUID,
-    body: TaskUpdate,
-    context: Annotated[TenantContext, Depends(require_any_member)],
-    session: Session = Depends(get_session),
-) -> dict:
-    task = service.update_task(session, context, task_id, body)
     return {"data": TaskOut.model_validate(task)}

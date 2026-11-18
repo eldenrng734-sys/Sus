@@ -1,4 +1,4 @@
-﻿"""CSV lead import. Every row goes through crud.create_lead (one path for all sources)."""
+"""CSV lead import. Every row goes through crud.create_lead (one path for all sources)."""
 
 import csv
 import hashlib
@@ -61,11 +61,7 @@ def parse_csv(raw: bytes) -> list[tuple[int, dict[str, str]]]:
         if number - 1 > MAX_ROWS:
             raise AuthError(422, "validation_error", "Too many rows (maximum 10,000)")
 
-        clean = {
-            k: (v or "").strip()
-            for k, v in row.items()
-            if k and isinstance(v, str | None)
-        }
+        clean = {k: (v or "").strip() for k, v in row.items() if k and isinstance(v, str | None)}
 
         if any(clean.values()):
             rows.append((number, clean))
@@ -138,9 +134,7 @@ def _to_lead(clean: dict[str, str]) -> LeadCreate:
         source_campaign=(
             neutralize(clean["source_campaign"]) if clean.get("source_campaign") else None
         ),
-        external_id=(
-            neutralize(clean["external_id"]) if clean.get("external_id") else None
-        ),
+        external_id=(neutralize(clean["external_id"]) if clean.get("external_id") else None),
         consent=consent_value in TRUE_VALUES,
         notes=notes,
     )
@@ -178,7 +172,11 @@ def import_csv(
                 or (external_id and external_id in seen_external_ids)
             ):
                 duplicates += 1
-                report(number, "duplicate_in_file", "Same email, phone, or external ID as an earlier row")
+                report(
+                    number,
+                    "duplicate_in_file",
+                    "Same email, phone, or external ID as an earlier row",
+                )
                 continue
 
             assigned_user_id = None
@@ -207,9 +205,7 @@ def import_csv(
                         "team_id": team_id,
                     }
                 )
-                row_key = hashlib.sha256(
-                    f"{idempotency_key}:{number}".encode()
-                ).hexdigest()
+                row_key = hashlib.sha256(f"{idempotency_key}:{number}".encode()).hexdigest()
                 crud.create_lead(session, ctx, body, row_key)
 
             created += 1
@@ -228,7 +224,11 @@ def import_csv(
         except AuthError as exc:
             if exc.code == "duplicate_lead":
                 duplicates += 1
-                report(number, "duplicate_lead", "A lead with this email, phone, or external ID already exists")
+                report(
+                    number,
+                    "duplicate_lead",
+                    "A lead with this email, phone, or external ID already exists",
+                )
             else:
                 failed += 1
                 report(number, exc.code, exc.message)

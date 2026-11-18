@@ -187,6 +187,23 @@ CHECK (status IN ('active','suspended','deleted')),
 CHECK (slug = lower(slug))
 ```
 
+### `tenant_settings` 🔶 (Step #9)
+
+Tenant-specific operational configuration including timezone and quiet hours.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `tenant_id` | uuid PK FK | FK `tenants(id)` ON DELETE CASCADE |
+| `timezone` | varchar(50) NOT NULL DEFAULT `'Asia/Dhaka'` | Valid IANA timezone name |
+| `quiet_hours_start` | time NOT NULL DEFAULT `'21:00:00'` | 24h local time window start |
+| `quiet_hours_end` | time NOT NULL DEFAULT `'09:00:00'` | 24h local time window end |
+| `updated_at` | timestamptz NOT NULL DEFAULT `now()` | |
+
+RLS:
+- `ENABLE ROW LEVEL SECURITY`, `FORCE ROW LEVEL SECURITY`.
+- Policy: `tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid`.
+
+
 ### `users` ✅ (columns 🔶)
 
 Global user identity. Company access comes from `tenant_memberships`.
@@ -1138,7 +1155,7 @@ If the setting is unset or empty, `NULLIF` returns `NULL`, the comparison is nev
 
 ### Tenant tables that need this policy
 
-`tenant_memberships`, `teams`, `invitations`, `leads`, `assignment_cursors`, `contacts`, `interactions`, `lead_forms`, `conversations`, `conversation_reads`, `messages`, `message_attachments`, `lead_assessments`, `tasks`, `integrations`, `webhook_events`, `import_jobs`, `outbox_events`, `idempotency_keys`, `audit_logs`, and `support_access_grants`. Any new table with `tenant_id` joins this list unless it has an entry in **Special cases** below.
+`tenant_memberships`, `teams`, `invitations`, `leads`, `assignment_cursors`, `contacts`, `interactions`, `lead_forms`, `conversations`, `conversation_reads`, `messages`, `message_attachments`, `lead_assessments`, `tasks`, `integrations`, `webhook_events`, `import_jobs`, `outbox_events`, `idempotency_keys`, `audit_logs`, `support_access_grants`, and `tenant_settings`. Any new table with `tenant_id` joins this list unless it has an entry in **Special cases** below.
 
 ### Special cases ⚠️
 

@@ -4,17 +4,21 @@ services:
     ports:
       - "127.0.0.1:8025:8025"
       - "127.0.0.1:1025:1025"
+    networks:
+      - crm_net
 
   db:
-    image: postgres:16
+    image: postgres:16.8-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-        - "127.0.0.1:5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - crm_net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -26,10 +30,12 @@ services:
     environment:
       APP_ENV: ${APP_ENV}
       DATABASE_URL: ${DATABASE_URL}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:-}
       MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-}
+      BACKUP_DATABASE_URL: ${BACKUP_DATABASE_URL:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
-      N8N_SERVICE_SECRET: ${N8N_SERVICE_SECRET:-}
+      SERVICE_HMAC_SECRET: ${SERVICE_HMAC_SECRET:-}
       WATCHFILES_FORCE_POLLING: "true"
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
@@ -39,9 +45,112 @@ services:
       - "8000:8000"
     volumes:
       - ../backend:/app
+    networks:
+      - crm_net
+      - automation_net
     depends_on:
       db:
         condition: service_healthy
 
+  worker:
+    build: ../backend
+    command: python -m app.worker
+    environment:
+      APP_ENV: ${APP_ENV}
+      DATABASE_URL: ${DATABASE_URL}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:-}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-20.0}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-2}
+      AI_REVIEW_CONFIDENCE_THRESHOLD: ${AI_REVIEW_CONFIDENCE_THRESHOLD:-0.6}
+    volumes:
+      - ../backend:/app
+    networks:
+      - crm_net
+    depends_on:
+      db:
+        condition: service_healthy
+
+  dispatcher:
+    build: ../backend
+    command: python -m app.dispatcher
+    environment:
+      APP_ENV: ${APP_ENV}
+      DATABASE_URL: ${DATABASE_URL}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:-}
+      N8N_EVENT_SIGNING_SECRET: ${N8N_EVENT_SIGNING_SECRET:-}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://n8n:5678/webhook}
+    volumes:
+      - ../backend:/app
+    networks:
+      - crm_net
+      - automation_net
+    depends_on:
+      db:
+        condition: service_healthy
+
+  n8n_db:
+    image: postgres:16.8-alpine
+    environment:
+      POSTGRES_USER: ${N8N_DB_USER:-n8n}
+      POSTGRES_PASSWORD: ${N8N_DB_PASSWORD}
+      POSTGRES_DB: ${N8N_DB_NAME:-n8n}
+    volumes:
+      - n8n_db_data:/var/lib/postgresql/data
+    networks:
+      - automation_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${N8N_DB_USER:-n8n} -d ${N8N_DB_NAME:-n8n}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  n8n:
+    image: n8nio/n8n:1.76.3
+    depends_on:
+      n8n_db:
+        condition: service_healthy
+    networks:
+      - automation_net
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=n8n_db
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${N8N_DB_NAME:-n8n}
+      - DB_POSTGRESDB_USER=${N8N_DB_USER:-n8n}
+      - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=24
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=none
+      - GENERIC_TIMEZONE=Asia/Dhaka
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - WEBHOOK_URL=http://n8n:5678/
+      - SERVICE_HMAC_SECRET=${SERVICE_HMAC_SECRET:-}
+      - N8N_EVENT_SIGNING_SECRET=${N8N_EVENT_SIGNING_SECRET:-}
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - NODE_FUNCTION_ALLOW_ENV=SERVICE_HMAC_SECRET,N8N_EVENT_SIGNING_SECRET
+    volumes:
+      - n8n_data:/home/node/.n8n
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5678/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  crm_net:
+    driver: bridge
+  automation_net:
+    driver: bridge
+
 volumes:
   pgdata:
+  n8n_data:
+  n8n_db_data:

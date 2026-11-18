@@ -1,0 +1,70 @@
+{
+  "name": "Workflow: Global Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json || {};\nconst execution = item.execution || {};\nconst workflow = item.workflow || {};\nconst error = execution.error || {};\nconst node = error.node || {};\n\nconst workflowId = workflow.id ? String(workflow.id) : 'unknown';\nconst workflowName = workflow.name ? String(workflow.name).slice(0, 200) : null;\nconst nodeName = node.name ? String(node.name).slice(0, 200) : null;\nconst errorClass = error.name ? String(error.name).slice(0, 200) : 'WorkflowExecutionError';\nconst errorMessage = error.message ? String(error.message).slice(0, 500) : null;\nconst tenantId = (execution.customData && execution.customData.tenant_id) || $env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000000';\nconst execId = execution.id || String(Date.now());\n\nreturn [{\n  json: {\n    tenant_id: tenantId,\n    idempotency_key: 'err-' + execId,\n    body: {\n      workflow_id: workflowId,\n      workflow_name: workflowName,\n      node_name: nodeName,\n      error_class: errorClass,\n      error_message: errorMessage\n    }\n  }\n}];"
+      },
+      "id": "2",
+      "name": "Extract Error Context (Sanitized)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "subworkflow_sign_and_call",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "method": "POST",
+            "path": "/internal/v1/automation/errors",
+            "tenant_id": "={{ $json.tenant_id }}",
+            "idempotency_key": "={{ $json.idempotency_key }}",
+            "body": "={{ $json.body }}"
+          }
+        }
+      },
+      "id": "3",
+      "name": "Report Error to Backend",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [640, 300]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Error Context (Sanitized)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Error Context (Sanitized)": {
+      "main": [
+        [
+          {
+            "node": "Report Error to Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

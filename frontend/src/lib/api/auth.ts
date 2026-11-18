@@ -31,13 +31,13 @@ type LoginResult =
   | AuthSession
   | {
       mfa_required: true;
-      challenge_token: string;
-      expires_in: number;
+      mfa_setup_required: false;
+      challenge: string;
     }
   | {
+      mfa_required: false;
       mfa_setup_required: true;
-      setup_token: string;
-      expires_in: number;
+      challenge: string;
     };
 
 type LoginInput = {
@@ -45,19 +45,31 @@ type LoginInput = {
   password: string;
 };
 
-type MfaVerifyInput = {
-  challenge_token: string;
+type MfaCodeInput = {
+  challenge: string;
   code: string;
 };
 
-type MeResponse = {
+export type MfaEnrollment = {
+  secret: string;
+  otpauth_uri: string;
+};
+
+type MfaEnrollmentSession = AuthSession & {
+  recovery_codes: string[];
+};
+
+export type CurrentUser = {
   id: string;
   email: string;
-  full_name: string;
+  display_name: string;
+  role: "rep" | "manager" | "admin";
+  team_id: string | null;
   is_active: boolean;
-  mfa_enabled: boolean;
-  memberships: Membership[];
+  tenant_timezone: string;
 };
+
+export type MeResponse = CurrentUser;
 
 function saveSession(session: AuthSession): void {
   tokenStore.set(session.access_token);
@@ -86,7 +98,7 @@ export async function login(input: LoginInput): Promise<LoginResult> {
 }
 
 export async function verifyMfa(
-  input: MfaVerifyInput,
+  input: MfaCodeInput,
 ): Promise<AuthSession> {
   const response = await apiRequest<{ data: AuthSession }>(
     "/auth/mfa/verify",
@@ -102,11 +114,41 @@ export async function verifyMfa(
   return response.data;
 }
 
+export async function startMfaEnrollment(
+  challenge: string,
+): Promise<MfaEnrollment> {
+  const response = await apiRequest<{ data: MfaEnrollment }>("/auth/mfa/setup", {
+    method: "POST",
+    body: { challenge },
+    auth: false,
+    tenantScoped: false,
+  });
+
+  return response.data;
+}
+
+export async function confirmMfaEnrollment(
+  input: MfaCodeInput,
+): Promise<MfaEnrollmentSession> {
+  const response = await apiRequest<{ data: MfaEnrollmentSession }>(
+    "/auth/mfa/confirm",
+    {
+      method: "POST",
+      body: input,
+      auth: false,
+      tenantScoped: false,
+    },
+  );
+
+  saveSession(response.data);
+  return response.data;
+}
+
 export async function getCurrentUser(): Promise<MeResponse> {
-  const response = await apiRequest<{ data: MeResponse }>("/auth/me", {
+  const response = await apiRequest<{ data: MeResponse }>("/users/me", {
     method: "GET",
     auth: true,
-    tenantScoped: false,
+    tenantScoped: Boolean(tenantStore.get()),
   });
 
   return response.data;

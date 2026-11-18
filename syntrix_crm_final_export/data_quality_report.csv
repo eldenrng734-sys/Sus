@@ -1,0 +1,6 @@
+Table,TotalRows,MissingPrimaryKeys,DuplicateKeys
+Contacts,100,0,0
+Leads,200,0,0
+Interactions,500,0,0
+Opportunities,500,0,0
+Sales,495,0,0

@@ -4,7 +4,7 @@ import { csrfStore } from "@/lib/auth/csrf";
 import { tenantStore } from "@/lib/auth/tenant";
 import { ApiRequestError } from "@/types/api";
 
-type RequestOptions = {
+export type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
   headers?: HeadersInit;
@@ -25,13 +25,27 @@ type RefreshResponse = {
 let refreshPromise: Promise<boolean> | null = null;
 
 function createIdempotencyKey(): string {
-  return crypto.randomUUID();
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 function parseError(status: number, payload: unknown): ApiRequestError {
+  let fallbackMessage = "The request could not be completed.";
+  if (status === 502 || status === 503 || status === 504) {
+    fallbackMessage = "Backend server is unavailable. Please check that the backend is running.";
+  } else if (status === 500 && payload === null) {
+    fallbackMessage = "Unable to connect to the backend server. Please verify the backend is running on port 8000.";
+  }
+
   const fallback = {
     code: "request_failed",
-    message: "The request could not be completed.",
+    message: fallbackMessage,
     details: null,
     request_id: null,
   };
@@ -49,10 +63,39 @@ function parseError(status: number, payload: unknown): ApiRequestError {
     );
   }
 
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "detail" in payload
+  ) {
+    let msg = fallback.message;
+    if (typeof (payload as { detail: unknown }).detail === "string") {
+      msg = (payload as { detail: string }).detail;
+    } else if (Array.isArray((payload as { detail: unknown }).detail)) {
+      msg = (payload as { detail: Array<{ msg?: string }> }).detail
+        .map((d) => d.msg || "")
+        .filter(Boolean)
+        .join(", ");
+    }
+    return new ApiRequestError(status, { ...fallback, message: msg });
+  }
+
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "message" in payload &&
+    typeof (payload as { message: unknown }).message === "string"
+  ) {
+    return new ApiRequestError(status, {
+      ...fallback,
+      message: (payload as { message: string }).message,
+    });
+  }
+
   return new ApiRequestError(status, fallback);
 }
 
-async function refreshAccessToken(): Promise<boolean> {
+export async function refreshAccessToken(): Promise<boolean> {
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
@@ -127,6 +170,9 @@ export async function apiRequest<T>(
     const refreshed = await refreshAccessToken();
 
     if (!refreshed) {
+      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
       throw new ApiRequestError(401, {
         code: "unauthorized",
         message: "Your session has expired. Please log in again.",
@@ -174,7 +220,11 @@ export async function apiRequest<T>(
     headers.set("Idempotency-Key", idempotencyKey);
   }
 
-  const response = await fetch(`${env.apiBaseUrl}${path}`, {
+  const normalizedPath = path.startsWith("/api/v1")
+    ? path
+    : `${env.apiBaseUrl}${path.startsWith("/") ? "" : "/"}${path}`;
+
+  const response = await fetch(normalizedPath, {
     method,
     headers,
     credentials: "include",
@@ -183,7 +233,9 @@ export async function apiRequest<T>(
         ? undefined
         : body instanceof FormData
           ? body
-          : JSON.stringify(body),
+          : typeof body === "string"
+            ? body
+            : JSON.stringify(body),
   });
 
   if (
@@ -204,6 +256,10 @@ export async function apiRequest<T>(
     tokenStore.clear();
     csrfStore.clear();
     tenantStore.clear();
+
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
 
     throw new ApiRequestError(401, {
       code: "unauthorized",

@@ -10,6 +10,7 @@ from app.modules.invitations.models import Invitation  # noqa: F401
 from app.modules.lead_forms.models import LeadForm  # noqa: F401
 from app.modules.leads.models import AssignmentCursor, Contact, Interaction, Lead  # noqa: F401
 from app.modules.notifications.models import Notification  # noqa: F401
+from app.modules.settings.models import TenantSettings  # noqa: F401
 from app.modules.tasks.models import Task  # noqa: F401
 from app.modules.tenants.models import Team, Tenant, TenantMembership  # noqa: F401
 from app.modules.users.models import User  # noqa: F401

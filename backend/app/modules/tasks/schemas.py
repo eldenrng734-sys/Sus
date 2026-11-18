@@ -1,4 +1,3 @@
-
 import uuid
 from datetime import datetime
 from typing import Literal
@@ -37,15 +36,15 @@ class TaskUpdate(BaseModel):
     due_at: datetime | None = None
     status: TaskStatus | None = None
     assigned_user_id: uuid.UUID | None = None
+    version: int | None = Field(
+        default=None,
+        description="Current task version for optimistic locking; send to detect conflicts",
+    )
 
     @field_validator("due_at")
     @classmethod
-    def due_at_must_be_timezone_aware(
-        cls, value: datetime | None
-    ) -> datetime | None:
-        if value is not None and (
-            value.tzinfo is None or value.utcoffset() is None
-        ):
+    def due_at_must_be_timezone_aware(cls, value: datetime | None) -> datetime | None:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
             raise ValueError("due_at must include a timezone")
         return value
 

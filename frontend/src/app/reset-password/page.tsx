@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -26,14 +26,20 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      const result = await apiFetch<{ message: string }>(
+      const response = await apiRequest<{ data?: { message?: string }; message?: string }>(
         "/auth/password-reset",
         {
           method: "POST",
-          body: JSON.stringify({ email }),
+          body: { email },
+          auth: false,
+          tenantScoped: false,
         }
       );
-      setMessage(result.message || "If the account exists, a reset email has been sent.");
+      setMessage(
+        response?.data?.message ||
+        response?.message ||
+        "If the account exists, a reset email has been sent."
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not request password reset.");
     } finally {
@@ -48,18 +54,12 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/v1/auth/password-reset/confirm", {
+      await apiRequest<void>("/auth/password-reset/confirm", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, new_password: password }),
+        body: { token, new_password: password },
+        auth: false,
+        tenantScoped: false,
       });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(
-          body.detail?.message || body.detail || "Invalid or expired reset link."
-        );
-      }
 
       setMessage("Password changed successfully. Redirecting to login...");
       setTimeout(() => router.push("/login"), 2000);

@@ -37,18 +37,15 @@ from typing import Literal
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
-from app.modules.ai.provider import AIProviderError, analyze_with_openai
 from app.modules.ai.service import (
     PROMPT_VERSION,
-    build_assessment_prompt,
     persist_assessment,
     redact_pii,
 )
 
 logger = logging.getLogger("app.ai.jobs")
 
-HANDLED_EVENTS = ("lead.created", "message.received")
+HANDLED_EVENTS = ("assessment.requested", "lead.created", "message.received")
 MAX_ATTEMPTS = 5
 LEASE_SECONDS = 300  # a 'processing' row older than this is treated as abandoned
 BATCH_SIZE = 10
@@ -67,6 +64,7 @@ class ClaimedEvent:
     event_type: str
     aggregate_id: uuid.UUID
     attempts: int
+    aggregate_type: str = "lead"
 
 
 @dataclass(frozen=True)
@@ -92,25 +90,15 @@ Analyzer = Callable[[JobInput], AnalysisResult]
 
 
 def default_analyzer(job: JobInput) -> AnalysisResult:
-    """Run the configured conversation analyzer over the already-redacted input."""
-    configured_key = settings.openai_api_key
-    api_key = configured_key.get_secret_value() if configured_key is not None else ""
-    if not api_key.strip():
-        raise AIProviderError("AI conversation analysis is not configured")
+    """Run the configured conversation analyzer over the already-redacted input.
 
-    prompt = build_assessment_prompt(job.redacted_messages, pii_values=job.pii_values)
-    output = analyze_with_openai(
-        prompt,
-        api_key=api_key,
-        model=settings.openai_model,
-        timeout_seconds=settings.openai_timeout_seconds,
-    )
-    return AnalysisResult(
-        output=output.model_dump(),
-        model=settings.openai_model,
-        prompt_version=prompt["prompt_version"],
-        status="ok",
-    )
+    Delegates to get_adapter() so the LLM provider is selected by LLM_PROVIDER.
+    This function exists for backward compatibility; new code should call
+    get_adapter() directly and pass the result to run_forever().
+    """
+    from app.modules.ai.adapter import get_adapter
+
+    return get_adapter()(job)
 
 
 def _failed_result() -> AnalysisResult:
@@ -140,7 +128,7 @@ _CLAIM_SQL = text(
            attempts = e.attempts + 1
       FROM picked
      WHERE e.id = picked.id
-    RETURNING e.id, e.tenant_id, e.event_type, e.aggregate_id, e.attempts
+    RETURNING e.id, e.tenant_id, e.event_type, e.aggregate_id, e.attempts, e.aggregate_type
     """
 )
 
@@ -150,7 +138,10 @@ def worker_id() -> str:
 
 
 def claim_batch(
-    session_factory: SessionFactory, *, limit: int = BATCH_SIZE, worker: str | None = None
+    session_factory: SessionFactory,
+    *,
+    limit: int = BATCH_SIZE,
+    worker: str | None = None,
 ) -> list[ClaimedEvent]:
     """Claim a bounded batch in one short transaction.
 
@@ -168,7 +159,17 @@ def claim_batch(
             },
         ).all()
         db.commit()
-    return [ClaimedEvent(r.id, r.tenant_id, r.event_type, r.aggregate_id, r.attempts) for r in rows]
+    return [
+        ClaimedEvent(
+            r.id,
+            r.tenant_id,
+            r.event_type,
+            r.aggregate_id,
+            r.attempts,
+            getattr(r, "aggregate_type", "lead"),
+        )
+        for r in rows
+    ]
 
 
 # --------------------------------------------------------------------------- helpers
@@ -176,7 +177,10 @@ def claim_batch(
 
 def _set_tenant(db: Session, tenant_id: uuid.UUID) -> None:
     """Transaction-local tenant context. Must be re-run after every commit."""
-    db.execute(text("SELECT set_config('app.tenant_id', :t, true)"), {"t": str(tenant_id)})
+    db.execute(
+        text("SELECT set_config('app.tenant_id', :t, true)"),
+        {"t": str(tenant_id)},
+    )
 
 
 def _mark(db: Session, event: ClaimedEvent, status: str, error: str | None) -> None:
@@ -214,7 +218,9 @@ def _load(db: Session, event: ClaimedEvent) -> _Loaded | None:
     conversation_id: uuid.UUID | None = None
     since = None
 
-    if event.event_type == "message.received":
+    if event.event_type == "message.received" or (
+        event.event_type == "assessment.requested" and event.aggregate_type == "message"
+    ):
         row = db.execute(
             text(
                 """
@@ -307,7 +313,11 @@ def _run_analyzer(analyzer: Analyzer, job: JobInput) -> AnalysisResult:
     except NotImplementedError:
         raise  # a wiring mistake, not an LLM failure: retry, then dead, never hide it
     except Exception as exc:
-        logger.warning("analyzer_failed lead=%s error=%s", job.lead_id, type(exc).__name__)
+        logger.warning(
+            "analyzer_failed lead=%s error=%s",
+            job.lead_id,
+            type(exc).__name__,
+        )
         return _failed_result()
     if not isinstance(result, AnalysisResult) or result.status not in ("ok", "fallback", "failed"):
         return _failed_result()
@@ -315,7 +325,10 @@ def _run_analyzer(analyzer: Analyzer, job: JobInput) -> AnalysisResult:
 
 
 def _persist_and_mark(
-    session_factory: SessionFactory, event: ClaimedEvent, job: JobInput, result: AnalysisResult
+    session_factory: SessionFactory,
+    event: ClaimedEvent,
+    job: JobInput,
+    result: AnalysisResult,
 ) -> None:
     """Assessment + 'processed' commit together, so a crash cannot leave a duplicate window."""
     with session_factory() as db:
@@ -335,7 +348,11 @@ def _persist_and_mark(
         db.commit()
 
 
-def _fail_or_retry(session_factory: SessionFactory, event: ClaimedEvent, exc: Exception) -> None:
+def _fail_or_retry(
+    session_factory: SessionFactory,
+    event: ClaimedEvent,
+    exc: Exception,
+) -> None:
     code = type(exc).__name__  # class name only: never put message text in last_error
     if event.attempts >= MAX_ATTEMPTS:
         _finish(session_factory, event, "dead", code)
@@ -362,7 +379,9 @@ def _fail_or_retry(session_factory: SessionFactory, event: ClaimedEvent, exc: Ex
 
 
 def process_event(
-    session_factory: SessionFactory, event: ClaimedEvent, analyzer: Analyzer = default_analyzer
+    session_factory: SessionFactory,
+    event: ClaimedEvent,
+    analyzer: Analyzer = default_analyzer,
 ) -> str:
     """Handle one claimed event. Returns: ok | fallback | failed | skipped | dead | error."""
     if event.attempts > MAX_ATTEMPTS:  # e.g. a worker that keeps crashing mid-job
@@ -394,7 +413,11 @@ def process_event(
         try:
             _fail_or_retry(session_factory, event, exc)
         except Exception as inner:  # DB down: the lease will let another run reclaim it
-            logger.error("job_retry_failed event=%s error=%s", event.id, type(inner).__name__)
+            logger.error(
+                "job_retry_failed event=%s error=%s",
+                event.id,
+                type(inner).__name__,
+            )
         return "error"
 
 

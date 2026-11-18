@@ -55,8 +55,12 @@ frontend\
   src\app\                  Next.js routes and screens
 infrastructure\
   docker-compose.yml        Local database, backend, and Mailpit services
-docs\                       Setup and user guides
+docs\                       Setup, user guides, and AI evaluation report
 ```
+
+See [docs/AI_EVAL.md](docs/AI_EVAL.md) for the AI classification evaluation methodology,
+dataset specification, review-confidence threshold rationale, and instructions for running
+the evaluation against the live model.
 
 ## Quick start
 

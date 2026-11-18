@@ -213,12 +213,13 @@ def _audit_mfa(session: Session, user: User, action: str, ip: str | None, ua: st
     )
 
 
-def _session_data(user: User, started: dict[str, str]) -> dict:
+def _session_data(session: Session, user: User, started: dict[str, str]) -> dict:
     return {
         "access_token": started["access_token"],
         "token_type": "bearer",
         "expires_in": settings.access_token_expire_minutes * 60,
         "csrf_token": started["csrf_token"],
+        "memberships": sessions.list_user_memberships(session, user.id),
         "user": {
             "id": str(user.id),
             "email": user.email,
@@ -283,10 +284,10 @@ def confirm_enrollment(
     started = sessions.start_session(session, user.id, ip, user_agent, mfa_verified=True)
     record_login_attempt(session, email=user.email, ip_address=ip, success=True)
     _audit_mfa(session, user, "auth.mfa.enabled", ip, user_agent)
-    session.commit()
 
-    data = _session_data(user, started)
+    data = _session_data(session, user, started)
     data["recovery_codes"] = recovery_codes
+    session.commit()
     return data, started["refresh_token"]
 
 
@@ -325,8 +326,9 @@ def verify_login(
     started = sessions.start_session(session, user.id, ip, user_agent, mfa_verified=True)
     record_login_attempt(session, email=user.email, ip_address=ip, success=True)
     _audit_mfa(session, user, "auth.mfa.login", ip, user_agent)
+    data = _session_data(session, user, started)
     session.commit()
-    return _session_data(user, started), started["refresh_token"]
+    return data, started["refresh_token"]
 
 
 def require_mfa_access(session: Session, user: User, amr: list[str]) -> None:

@@ -252,6 +252,7 @@ def login(
         success=True,
     )
 
+    memberships = sessions.list_user_memberships(session, user.id)
     session.commit()
 
     data = {
@@ -265,6 +266,7 @@ def login(
             "full_name": user.full_name,
             "email_verified": True,
         },
+        "memberships": memberships,
     }
 
     return data, started["refresh_token"]

@@ -90,6 +90,36 @@ class EvaluationFailure:
     reason: Literal["provider_error", "invalid_prediction"]
 
 
+REVIEW_CONFIDENCE_THRESHOLD: float = 0.6
+
+
+@dataclass(frozen=True)
+class ConfusionRow:
+    """One row of the intent confusion table: expected → {predicted: count}."""
+
+    expected: str
+    predicted_counts: dict[str, int]
+
+
+@dataclass(frozen=True)
+class ReviewThresholdMetrics:
+    """How well the confidence threshold identifies wrong predictions.
+
+    A prediction is *low-confidence* if the model returns confidence < threshold.
+    We want to know: of the low-confidence predictions, how many were actually
+    wrong (true positives for the review flag)?
+    """
+
+    threshold: float
+    total_predictions: int
+    low_confidence_count: int
+    high_confidence_count: int
+    low_confidence_wrong_count: int
+    high_confidence_wrong_count: int
+    low_confidence_error_rate_percent: float | None
+    high_confidence_error_rate_percent: float | None
+
+
 @dataclass(frozen=True)
 class EvaluationReport:
     total_records: int
@@ -99,6 +129,8 @@ class EvaluationReport:
     overall_field_accuracy_percent: float | None
     by_language: dict[str, EvaluationGroup]
     failures: tuple[EvaluationFailure, ...]
+    intent_confusion: tuple[ConfusionRow, ...]
+    review_threshold: ReviewThresholdMetrics
 
 
 def _validate_expected(expected: Mapping[str, object]) -> dict[str, str]:
@@ -164,10 +196,27 @@ def _validate_prediction(prediction: object) -> dict[str, str]:
         prediction = prediction.model_dump()
     if not isinstance(prediction, Mapping):
         raise InvalidPredictionError
+    # Strip any extra keys (e.g. 'confidence') before strict validation.
+    filtered = {k: prediction[k] for k in EVALUATED_FIELDS if k in prediction}
     try:
-        return EvaluationLabels.model_validate(dict(prediction)).model_dump()
+        return EvaluationLabels.model_validate(filtered).model_dump()
     except (ValidationError, TypeError, ValueError) as exc:
         raise InvalidPredictionError from exc
+
+
+def _extract_confidence(output: object) -> float:
+    """Return the confidence value from a raw predictor output, defaulting to 1.0."""
+    if isinstance(output, Mapping) and "confidence" in output:
+        try:
+            return float(output["confidence"])
+        except (TypeError, ValueError):
+            pass
+    elif hasattr(output, "confidence"):
+        try:
+            return float(output.confidence)  # type: ignore[union-attr]
+        except (TypeError, ValueError):
+            pass
+    return 1.0
 
 
 def _predict_with_llm(message: str) -> object:
@@ -229,6 +278,15 @@ def evaluate_records(
     successful_by_language = {"en": 0, "bn": 0}
     failures: list[EvaluationFailure] = []
 
+    # For intent confusion matrix: expected_intent → {predicted_intent: count}
+    intent_values = ["request_demo", "pricing", "support", "info", "complaint", "other", "unknown"]
+    intent_confusion: dict[str, dict[str, int]] = {
+        v: {w: 0 for w in intent_values} for v in intent_values
+    }
+
+    # For review-threshold metrics: track (confidence, was_any_field_wrong) per prediction
+    threshold_samples: list[tuple[float, bool]] = []
+
     for record in records:
         expected = _validate_expected(record.expected)
         try:
@@ -246,9 +304,20 @@ def evaluate_records(
             continue
 
         successful_by_language[record.language] += 1
+        any_field_wrong = False
         for field in EVALUATED_FIELDS:
             if predicted[field] == expected[field]:
                 correct_by_language[record.language][field] += 1
+            else:
+                any_field_wrong = True
+
+        # Intent confusion: only count rows where both expected and predicted are known intents
+        exp_intent = expected.get("intent", "unknown")
+        pred_intent = predicted.get("intent", "unknown")
+        if exp_intent in intent_confusion and pred_intent in intent_confusion[exp_intent]:
+            intent_confusion[exp_intent][pred_intent] += 1
+
+        threshold_samples.append((_extract_confidence(output), any_field_wrong))
 
     language_totals = {
         language: sum(record.language == language for record in records)
@@ -268,6 +337,33 @@ def evaluate_records(
         for field in EVALUATED_FIELDS
     }
     overall = _group_metrics(total, sum(successful_by_language.values()), overall_correct)
+
+    # Build confusion rows (only intents with at least one expected occurrence)
+    confusion_rows = tuple(
+        ConfusionRow(expected=exp_intent, predicted_counts=dict(counts))
+        for exp_intent, counts in sorted(intent_confusion.items())
+        if sum(counts.values()) > 0
+    )
+
+    # Build review-threshold metrics
+    thr = REVIEW_CONFIDENCE_THRESHOLD
+    low_conf = [(c, w) for c, w in threshold_samples if c < thr]
+    high_conf = [(c, w) for c, w in threshold_samples if c >= thr]
+    low_wrong = sum(1 for _, w in low_conf if w)
+    high_wrong = sum(1 for _, w in high_conf if w)
+    review_metrics = ReviewThresholdMetrics(
+        threshold=thr,
+        total_predictions=len(threshold_samples),
+        low_confidence_count=len(low_conf),
+        high_confidence_count=len(high_conf),
+        low_confidence_wrong_count=low_wrong,
+        high_confidence_wrong_count=high_wrong,
+        low_confidence_error_rate_percent=((100 * low_wrong / len(low_conf)) if low_conf else None),
+        high_confidence_error_rate_percent=(
+            (100 * high_wrong / len(high_conf)) if high_conf else None
+        ),
+    )
+
     return EvaluationReport(
         total_records=total,
         successful_predictions=sum(successful_by_language.values()),
@@ -276,7 +372,34 @@ def evaluate_records(
         overall_field_accuracy_percent=overall.overall_field_accuracy_percent,
         by_language=group_reports,
         failures=tuple(failures),
+        intent_confusion=confusion_rows,
+        review_threshold=review_metrics,
     )
+
+
+def _print_confusion_table(rows: tuple[ConfusionRow, ...]) -> None:
+    """Print a compact intent confusion table to stdout."""
+    if not rows:
+        return
+    all_predicted = sorted({k for row in rows for k in row.predicted_counts})
+    header = f"{'expected':<20}" + "".join(f"{p:<14}" for p in all_predicted)
+    print(header)
+    print("-" * len(header))
+    for row in rows:
+        line = f"{row.expected:<20}" + "".join(
+            f"{row.predicted_counts.get(p, 0):<14}" for p in all_predicted
+        )
+        print(line)
+
+
+def _print_threshold_summary(m: ReviewThresholdMetrics) -> None:
+    low_pct = m.low_confidence_error_rate_percent
+    high_pct = m.high_confidence_error_rate_percent
+    low_rate = f"{low_pct:.1f}%" if low_pct is not None else "n/a"
+    high_rate = f"{high_pct:.1f}%" if high_pct is not None else "n/a"
+    print(f"\nReview-threshold (confidence < {m.threshold}):")
+    print(f"  low-confidence predictions : {m.low_confidence_count:>4}  ({low_rate} wrong)")
+    print(f"  high-confidence predictions: {m.high_confidence_count:>4}  ({high_rate} wrong)")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -297,6 +420,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     print(json.dumps(asdict(report), ensure_ascii=False, indent=2))
+    print("\n--- Intent confusion matrix ---")
+    _print_confusion_table(report.intent_confusion)
+    _print_threshold_summary(report.review_threshold)
     return 0
 
 

@@ -189,11 +189,13 @@ class WhatsAppProvider:
             new_status = status_data.get("status")
             if wamid and new_status in {"sent", "delivered", "read", "failed"}:
                 db_msg = session.execute(
-                    select(Message).where(
+                    select(Message)
+                    .where(
                         Message.tenant_id == tenant_id,
                         Message.provider == "whatsapp",
                         Message.provider_message_id == wamid,
-                    ).limit(1)
+                    )
+                    .limit(1)
                 ).scalar_one_or_none()
                 if db_msg is not None:
                     db_msg.status = new_status
@@ -270,4 +272,3 @@ class WhatsAppProvider:
 # Register default WhatsApp provider instance
 whatsapp_provider = WhatsAppProvider()
 register_provider(whatsapp_provider)
-

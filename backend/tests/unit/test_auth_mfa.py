@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -12,7 +13,7 @@ from app.modules.auth.errors import AuthError
 from app.modules.auth.schemas import LoginRequest
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def fernet_key(monkeypatch):
     key = Fernet.generate_key().decode()
     monkeypatch.setattr(settings, "mfa_encryption_key", key)
@@ -150,6 +151,7 @@ def test_recovery_code_is_consumed_on_successful_mfa_login(monkeypatch):
     monkeypatch.setattr(mfa, "_check_mfa_rate_limit", lambda *args: None)
     monkeypatch.setattr(mfa, "_match_totp_step", lambda *args: None)
     monkeypatch.setattr(mfa, "_recovery_code_row", lambda *args: recovery_row)
+    monkeypatch.setattr(mfa.sessions, "list_user_memberships", lambda *args: [])
     monkeypatch.setattr(
         mfa.sessions,
         "start_session",
@@ -191,3 +193,29 @@ def test_started_refresh_session_preserves_mfa_assurance(monkeypatch, mfa_verifi
     stored_token = db.add.call_args.args[0]
     assert stored_token.mfa_verified is mfa_verified
     assert session_data["access_token"] == expected_amr
+
+
+def test_list_user_memberships_serializes_active_tenant_context():
+    db = MagicMock()
+    user_id = uuid.UUID("b57c4718-8ff3-4719-b3f0-56a124948ccb")
+    tenant_id = uuid.UUID("63e1527e-eafa-4bd0-9e97-e98033e5f7c1")
+    membership = SimpleNamespace(
+        tenant_id=tenant_id,
+        role="admin",
+        team_id=None,
+        is_active=True,
+    )
+    tenant = SimpleNamespace(name="Acme Traders")
+    db.execute.return_value.all.return_value = [(membership, tenant)]
+
+    result = sessions.list_user_memberships(db, user_id)
+
+    assert result == [
+        {
+            "tenant_id": str(tenant_id),
+            "tenant_name": "Acme Traders",
+            "role": "admin",
+            "team_id": None,
+            "is_active": True,
+        }
+    ]
