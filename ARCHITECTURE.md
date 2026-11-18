@@ -342,6 +342,13 @@ Committed outbox event → backend dispatcher → signed n8n webhook
 - n8n requests message sending through the backend; it never receives messaging-provider credentials. WhatsApp sends must respect the 24-hour window and approved templates where required.
 - Exports belong in `n8n/workflows/` without embedded credentials; minimize and expire execution data containing tenant content.
 
+### Outbox Retry and Dead Event Behavior
+- Dispatcher claims pending events with `FOR UPDATE SKIP LOCKED`.
+- Exponential backoff: `delay = min(BACKOFF_BASE_SECONDS * 2 ** (attempts - 1), BACKOFF_CAP_SECONDS)` with `BACKOFF_BASE_SECONDS = 30s` and `BACKOFF_CAP_SECONDS = 3600s`.
+- `MAX_ATTEMPTS = 5`: Upon reaching 5 failed attempts, the event transitions to `status = 'dead'` with non-sensitive `last_error`.
+- Dead events are NEVER automatically retried by the dispatcher.
+- Manual recovery: Platform administrators can inspect dead events and requeue them using `backend/scripts/requeue_dead.py`, which resets `attempts` to 0, sets status to `pending`, and writes an immutable entry to `audit_logs` (`action = 'outbox.requeue'`).
+
 The rep-notification endpoint uses a versioned HMAC request signature covering service ID, tenant ID, method, raw path/query, timestamp, idempotency key and the raw-body digest. This closes the tenant-selection signing gap for that endpoint only; other internal endpoints are not implemented here and must use the same tenant-bound authentication contract before exposure. A shared service key with an unsigned tenant selector is not sufficient isolation.
 
 Scheduled workflows also need an approved tenant-dispatch mechanism; do not add an unrestricted “list all tenants/leads” route to make scheduling convenient.

@@ -31,6 +31,7 @@ def _make_job() -> JobInput:
 
 # ── default_analyzer delegates to the adapter ────────────────────────────────
 
+
 def test_default_analyzer_uses_fake_adapter(monkeypatch):
     """default_analyzer routes through get_adapter(); FakeAnalyzer is returned
     when LLM_PROVIDER=fake in a non-production environment."""
@@ -57,6 +58,7 @@ def test_default_analyzer_fails_closed_when_provider_raises(monkeypatch):
 
 # ── _run_analyzer ─────────────────────────────────────────────────────────────
 
+
 def test_run_analyzer_with_fake_succeeds():
     result = _run_analyzer(FakeAnalyzer(), _make_job())
     assert result.status == "ok"
@@ -80,6 +82,7 @@ def test_run_analyzer_does_not_catch_not_implemented():
 
 # ── _failed_result ────────────────────────────────────────────────────────────
 
+
 def test_failed_result_has_expected_shape():
     r = _failed_result()
     assert r.status == "failed"
@@ -89,6 +92,7 @@ def test_failed_result_has_expected_shape():
 
 
 # ── process_event (in-memory session stubs) ───────────────────────────────────
+
 
 class _FakeSession:
     """Minimal session stub: records calls, never touches a DB."""

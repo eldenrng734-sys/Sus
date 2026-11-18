@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
 
 type SignupResponse = {
   tenant: { id: string; name: string; slug: string };
@@ -36,10 +36,14 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      const result = await apiFetch<SignupResponse>("/auth/signup", {
+      const response = await apiRequest<{ data: SignupResponse }>("/auth/signup", {
         method: "POST",
-        body: JSON.stringify(form),
+        body: form,
+        auth: false,
+        tenantScoped: false,
       });
+
+      const result = response.data;
 
       setSuccess(
         `Account created for ${result.user.email}. Please verify your email before logging in.`

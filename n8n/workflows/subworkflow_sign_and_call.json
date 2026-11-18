@@ -1,0 +1,76 @@
+{
+  "name": "Subworkflow: Sign and Call",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nconst input = $input.first().json;\nconst method = (input.method || 'GET').toUpperCase();\nconst path = input.path;\nconst tenantId = input.tenant_id;\nconst idempotencyKey = input.idempotency_key;\nconst body = input.body || null;\n\nconst rawBody = body ? (typeof body === 'string' ? body : JSON.stringify(body)) : '';\nconst timestamp = Math.floor(Date.now() / 1000).toString();\nconst bodySha256 = crypto.createHash('sha256').update(rawBody, 'utf8').digest('hex');\n\nconst serviceId = 'n8n';\nconst canonical = [\n  'v1',\n  serviceId,\n  tenantId,\n  method,\n  path,\n  timestamp,\n  idempotencyKey,\n  bodySha256\n].join('\\n');\n\nconst secret = $env.SERVICE_HMAC_SECRET || '';\nconst signature = 'sha256=' + crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex');\n\nconst headers = {\n  'X-Service-Id': serviceId,\n  'X-Tenant-ID': tenantId,\n  'X-Timestamp': timestamp,\n  'X-Idempotency-Key': idempotencyKey,\n  'X-Signature': signature,\n  'Content-Type': 'application/json'\n};\n\nreturn [{\n  json: {\n    url: 'http://backend:8000' + path,\n    method: method,\n    headers: headers,\n    body: body,\n    rawBody: rawBody\n  }\n}];"
+      },
+      "id": "2",
+      "name": "Compute Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Service-Id", "value": "={{ $json.headers['X-Service-Id'] }}" },
+            { "name": "X-Tenant-ID", "value": "={{ $json.headers['X-Tenant-ID'] }}" },
+            { "name": "X-Timestamp", "value": "={{ $json.headers['X-Timestamp'] }}" },
+            { "name": "X-Idempotency-Key", "value": "={{ $json.headers['X-Idempotency-Key'] }}" },
+            { "name": "X-Signature", "value": "={{ $json.headers['X-Signature'] }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": "={{ $json.method !== 'GET' && $json.method !== 'HEAD' }}",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body ? (typeof $json.body === 'string' ? $json.body : JSON.stringify($json.body)) : '' }}",
+        "options": {}
+      },
+      "id": "3",
+      "name": "HTTP Request Internal API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Compute Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Signature": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request Internal API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

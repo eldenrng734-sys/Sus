@@ -2,6 +2,12 @@ import logging
 import time
 import uuid
 
+import email_validator
+
+# Allow dev/test domains (.test, .example) across the application
+email_validator.TEST_ENVIRONMENT = True
+
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -10,14 +16,24 @@ from app.modules.ai.router import router as assessments_router
 from app.modules.auth.errors import AuthError
 from app.modules.auth.password_reset import router as password_reset_router
 from app.modules.auth.router import router as auth_router
+from app.modules.automation.router import router as automation_router
 from app.modules.conversations.router import router as conversations_router
+from app.modules.dashboard.router import router as dashboard_router
 from app.modules.integrations.router import router as integrations_router
 from app.modules.integrations.webhook_router import router as webhook_router
 from app.modules.invitations.router import router as invitations_router
-from app.modules.lead_forms.router import router as lead_forms_router
+from app.modules.lead_forms.router import (
+    router as lead_forms_router,
+    tenant_router as lead_forms_tenant_router,
+)
 from app.modules.leads.router import router as leads_router
 from app.modules.messaging.router import router as messaging_router
-from app.modules.notifications.router import router as notifications_router
+from app.modules.notifications.router import (
+    internal_router as internal_notifications_router,
+    router as notifications_router,
+)
+from app.modules.platform.router import router as platform_router
+from app.modules.settings.router import router as settings_router
 from app.modules.tasks.router import router as tasks_router
 from app.modules.teams.router import router as teams_router
 from app.modules.users.router import router as users_router
@@ -99,9 +115,11 @@ app.include_router(auth_router)
 app.include_router(password_reset_router)
 app.include_router(invitations_router)
 app.include_router(notifications_router)
+app.include_router(internal_notifications_router)
 app.include_router(assessments_router)
 app.include_router(conversations_router)
 app.include_router(lead_forms_router)
+app.include_router(lead_forms_tenant_router)
 app.include_router(leads_router)
 app.include_router(messaging_router)
 app.include_router(teams_router)
@@ -109,6 +127,10 @@ app.include_router(users_router)
 app.include_router(webhook_router)
 app.include_router(integrations_router)
 app.include_router(tasks_router)
+app.include_router(automation_router)
+app.include_router(settings_router)
+app.include_router(dashboard_router)
+app.include_router(platform_router)
 
 
 @app.exception_handler(AuthError)

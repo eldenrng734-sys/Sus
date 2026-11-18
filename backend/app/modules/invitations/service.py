@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 
 from app.core.security import generate_refresh_token, hash_password, hash_refresh_token
 from app.database.session import set_tenant_context
+from app.modules.audit.models import AuditLog
 from app.modules.auth.errors import AuthError
+from app.modules.auth.sessions import revoke_all_for_user
 from app.modules.invitations.models import Invitation
 from app.modules.invitations.schemas import AcceptRequest, InviteRequest
 from app.modules.tenants.models import TenantMembership
@@ -149,6 +151,8 @@ def deactivate_membership(
 ) -> dict:
     member = _get_member(session, admin, membership_id)
     member.is_active = False
+    # Revoke all live refresh tokens so the deactivated user loses access immediately.
+    revoke_all_for_user(session, member.user_id)
     session.commit()
     return {"id": str(member.id), "is_active": member.is_active}
 
@@ -160,6 +164,17 @@ def change_role(
     role: str,
 ) -> dict:
     member = _get_member(session, admin, membership_id)
+    old_role = member.role
     member.role = role
+    session.add(
+        AuditLog(
+            tenant_id=admin.tenant_id,
+            actor_user_id=admin.user_id,
+            action="membership.role_changed",
+            entity_type="tenant_membership",
+            entity_id=member.id,
+            details={"old_role": old_role, "new_role": role},
+        )
+    )
     session.commit()
     return {"id": str(member.id), "role": member.role}

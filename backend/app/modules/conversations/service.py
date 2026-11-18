@@ -95,7 +95,11 @@ def list_conversations(
     limit: int,
     offset: int,
 ) -> list[ConversationOut]:
-    stmt = _conversation_query(context)
+    stmt = select(Conversation, Lead).join(
+        Lead,
+        and_(Lead.tenant_id == Conversation.tenant_id, Lead.id == Conversation.lead_id),
+    )
+    stmt = apply_data_scope(stmt, Lead, context)
     if lead_id:
         stmt = stmt.where(Conversation.lead_id == lead_id)
     if status:
@@ -108,7 +112,35 @@ def list_conversations(
         .limit(limit)
         .offset(offset)
     )
-    return [ConversationOut.model_validate(c) for c in session.scalars(stmt)]
+    results: list[ConversationOut] = []
+    for conv, lead in session.execute(stmt).all():
+        out = ConversationOut.model_validate(conv)
+        out.lead_name = lead.name
+        out.lead_phone = lead.phone
+        out.lead_opted_out = lead.opted_out
+        results.append(out)
+    return results
+
+
+def get_conversation_detail(
+    session: Session,
+    context: TenantContext,
+    conversation_id: uuid.UUID,
+) -> ConversationOut:
+    stmt = select(Conversation, Lead).join(
+        Lead,
+        and_(Lead.tenant_id == Conversation.tenant_id, Lead.id == Conversation.lead_id),
+    ).where(Conversation.id == conversation_id)
+    stmt = apply_data_scope(stmt, Lead, context)
+    row = session.execute(stmt).first()
+    if row is None:
+        raise AuthError(404, "not_found", "Conversation not found")
+    conv, lead = row
+    out = ConversationOut.model_validate(conv)
+    out.lead_name = lead.name
+    out.lead_phone = lead.phone
+    out.lead_opted_out = lead.opted_out
+    return out
 
 
 def list_messages(

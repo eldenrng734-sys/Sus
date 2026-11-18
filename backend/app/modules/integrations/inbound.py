@@ -154,6 +154,10 @@ def store_inbound_message(
 
     if inbound.body_text and is_opt_out_message(inbound.body_text):
         apply_opt_out(session, lead.id, source=inbound.source)
+    else:
+        from app.modules.tasks.service import pause_followups
+
+        pause_followups(session, lead.id, reason="customer_reply")
 
     emit_message_received(
         session,

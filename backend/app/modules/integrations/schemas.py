@@ -36,4 +36,3 @@ class DisconnectIntegrationResponse(BaseModel):
     connected: bool = False
     id: uuid.UUID
     status: str
-

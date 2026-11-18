@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -20,3 +21,25 @@ class NotificationCreateRequest(BaseModel):
         if isinstance(value, str):
             return value.strip()
         return value
+
+
+class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    type: str
+    title: str
+    body: str
+    entity_type: str
+    entity_id: uuid.UUID
+    read_at: datetime | None = None
+    created_at: datetime
+
+
+class NotificationMeta(BaseModel):
+    unread_count: int
+
+
+class NotificationListResponse(BaseModel):
+    data: list[NotificationOut]
+    meta: NotificationMeta

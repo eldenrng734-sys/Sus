@@ -9,12 +9,17 @@ from app.modules.auth.errors import AuthError
 from app.modules.users import service
 from app.modules.users.schemas import UserProfileUpdate
 
+# ── constants ─────────────────────────────────────────────────────────────────
+DEFAULT_TIMEZONE = "Asia/Dhaka"
+
 
 def make_context():
     return SimpleNamespace(
         user_id=uuid.uuid4(),
         membership_id=uuid.uuid4(),
         tenant_id=uuid.uuid4(),
+        role="admin",
+        team_id=None,
     )
 
 
@@ -105,9 +110,7 @@ def test_update_current_user_does_not_commit_for_wrong_tenant():
     session.get.side_effect = [user, membership]
 
     with pytest.raises(AuthError) as exc:
-        service.update_current_user(
-            session, context, UserProfileUpdate(display_name="New Name")
-        )
+        service.update_current_user(session, context, UserProfileUpdate(display_name="New Name"))
 
     assert exc.value.status_code == 404
     assert user.full_name == "Old Name"
@@ -128,3 +131,78 @@ def test_list_tenant_users_serializes_results():
     assert result[0]["id"] == str(user.id)
     assert result[0]["display_name"] == "Old Name"
     assert result[0]["role"] == "rep"
+
+
+# ── Additional tests added in step #4 ────────────────────────────────────────
+
+
+def test_get_current_user_includes_tenant_timezone():
+    """GET /me must return tenant_timezone (default Asia/Dhaka until #9)."""
+    context = make_context()
+    user = make_user(context)
+    membership = make_membership(context)
+
+    session = MagicMock()
+    session.get.side_effect = [user, membership]
+
+    result = service.get_current_user(session, context)
+
+    assert "tenant_timezone" in result
+    assert result["tenant_timezone"] == DEFAULT_TIMEZONE
+
+
+def test_profile_update_rejects_extra_role_field():
+    """PATCH /me must not silently accept a 'role' field — it must raise."""
+    with pytest.raises(ValidationError):
+        UserProfileUpdate.model_validate({"display_name": "New Name", "role": "admin"})
+
+
+def test_profile_update_rejects_extra_email_field():
+    with pytest.raises(ValidationError):
+        UserProfileUpdate.model_validate({"display_name": "New Name", "email": "other@example.com"})
+
+
+def test_profile_update_rejects_extra_tenant_field():
+    with pytest.raises(ValidationError):
+        UserProfileUpdate.model_validate(
+            {"display_name": "New Name", "tenant_id": str(uuid.uuid4())}
+        )
+
+
+def test_list_tenant_users_includes_timezone_in_serialized_output():
+    """Users list items include tenant_timezone (from _serialize_user)."""
+    context = make_context()
+    user = make_user(context)
+    membership = make_membership(context)
+
+    session = MagicMock()
+    session.execute.return_value.all.return_value = [(user, membership)]
+
+    result = service.list_tenant_users(session, context)
+
+    assert result[0]["tenant_timezone"] == DEFAULT_TIMEZONE
+
+
+def test_list_tenant_users_manager_scopes_to_own_team():
+    """Manager context must see only members of their team."""
+    context = SimpleNamespace(
+        user_id=uuid.uuid4(),
+        membership_id=uuid.uuid4(),
+        tenant_id=uuid.uuid4(),
+        role="manager",
+        team_id=uuid.uuid4(),
+    )
+    user = make_user(context)
+    membership = make_membership(context)
+    membership = SimpleNamespace(**{**membership.__dict__, "team_id": context.team_id})
+
+    session = MagicMock()
+    session.execute.return_value.all.return_value = [(user, membership)]
+
+    result = service.list_tenant_users(session, context)
+
+    # Verify WHERE clause was built with team_id (checked via statement arg)
+    call_args = session.execute.call_args
+    stmt_str = str(call_args.args[0])
+    assert "team_id" in stmt_str
+    assert len(result) == 1

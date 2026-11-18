@@ -59,6 +59,16 @@ def list_conversations(
     return {"data": data, "meta": {"limit": limit, "offset": offset}}
 
 
+@router.get("/conversations/{conversation_id}")
+def get_conversation(
+    conversation_id: uuid.UUID,
+    context: TenantContext = Depends(require_any_member),
+    session: Session = Depends(get_session),
+) -> dict:
+    data = service.get_conversation_detail(session, context, conversation_id)
+    return {"data": data}
+
+
 @router.get("/conversations/{conversation_id}/messages")
 def list_messages(
     conversation_id: uuid.UUID,

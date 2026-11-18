@@ -36,6 +36,7 @@ def _make_job() -> JobInput:
 
 # ── FakeAnalyzer ──────────────────────────────────────────────────────────────
 
+
 def test_fake_analyzer_returns_valid_result():
     result = FakeAnalyzer()(_make_job())
     assert isinstance(result, AnalysisResult)
@@ -60,6 +61,7 @@ def test_fake_analyzer_low_confidence_sets_review_flag():
 
 
 # ── get_adapter ───────────────────────────────────────────────────────────────
+
 
 def test_get_adapter_fake_allowed_in_non_production(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "fake")
@@ -93,6 +95,7 @@ def test_get_adapter_anthropic_returned_when_configured(monkeypatch):
 
 # ── Adapter error handling (AnthropicAdapter never raises into job runner) ────
 
+
 def test_anthropic_adapter_llm_error_returns_failed_result(monkeypatch):
     """Any LLMError from the client must be caught and become status=failed."""
     from app.modules.ai.adapter import AnthropicAdapter
@@ -109,6 +112,7 @@ def test_anthropic_adapter_llm_error_returns_failed_result(monkeypatch):
 
 
 # ── jobs._run_analyzer with FakeAnalyzer ─────────────────────────────────────
+
 
 def test_run_analyzer_with_fake_succeeds():
     job = _make_job()

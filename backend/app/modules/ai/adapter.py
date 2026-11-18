@@ -36,6 +36,7 @@ logger = logging.getLogger("app.ai.adapter")
 
 # ── Protocol ──────────────────────────────────────────────────────────────────
 
+
 @runtime_checkable
 class Analyzer(Protocol):
     """Callable that takes a JobInput and returns an AnalysisResult.
@@ -48,6 +49,7 @@ class Analyzer(Protocol):
 
 
 # ── Anthropic adapter ─────────────────────────────────────────────────────────
+
 
 class AnthropicAdapter:
     """Calls the Anthropic API through the existing LLMClient (llm_client.py).
@@ -63,9 +65,7 @@ class AnthropicAdapter:
 
     def __call__(self, job: JobInput) -> AnalysisResult:
         try:
-            prompt = build_assessment_prompt(
-                job.redacted_messages, pii_values=job.pii_values
-            )
+            prompt = build_assessment_prompt(job.redacted_messages, pii_values=job.pii_values)
             llm_result = self._client.complete(
                 system=prompt["system"],
                 user=prompt["user"],
@@ -73,9 +73,7 @@ class AnthropicAdapter:
                 max_tokens=512,
                 temperature=0.1,
             )
-            output = ConversationAnalysisOutput.model_validate(
-                json.loads(llm_result.text)
-            )
+            output = ConversationAnalysisOutput.model_validate(json.loads(llm_result.text))
             return AnalysisResult(
                 output=output.model_dump(),
                 model=llm_result.model,
@@ -99,6 +97,7 @@ class AnthropicAdapter:
 
 
 # ── Fake adapter (tests / CI only) ────────────────────────────────────────────
+
 
 class FakeAnalyzer:
     """Deterministic analyzer for tests.  Never touches the network.
@@ -144,6 +143,7 @@ class FakeAnalyzer:
 
 
 # ── Factory ───────────────────────────────────────────────────────────────────
+
 
 def get_adapter() -> Analyzer:
     """Return the adapter selected by the LLM_PROVIDER environment variable.

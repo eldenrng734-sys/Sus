@@ -49,9 +49,9 @@ def run(records, predictor):
 def test_load_dataset_validates_existing_jsonl():
     records = evaluate_ai.load_dataset(DATASET_PATH)
 
-    assert len(records) == 50
-    assert sum(record.language == "en" for record in records) == 25
-    assert sum(record.language == "bn" for record in records) == 25
+    assert len(records) == 60
+    assert sum(record.language == "en" for record in records) == 30
+    assert sum(record.language == "bn" for record in records) == 30
 
 
 def test_dataset_loader_rejects_malformed_record_without_echoing_message(tmp_path):

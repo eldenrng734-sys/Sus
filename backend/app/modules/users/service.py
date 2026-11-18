@@ -7,15 +7,19 @@ from app.modules.tenants.models import TenantMembership
 from app.modules.users.models import User
 from app.modules.users.schemas import UserProfileUpdate
 
+DEFAULT_TENANT_TIMEZONE = "Asia/Dhaka"
+
 
 def _serialize_user(user: User, membership: TenantMembership) -> dict:
     return {
         "id": str(user.id),
+        "membership_id": str(membership.id),
         "email": user.email,
         "display_name": user.full_name,
         "role": membership.role,
         "team_id": str(membership.team_id) if membership.team_id else None,
         "is_active": membership.is_active and user.is_active,
+        "tenant_timezone": DEFAULT_TENANT_TIMEZONE,
     }
 
 
@@ -71,6 +75,12 @@ def list_tenant_users(session: Session, context: TenantContext) -> list[dict]:
         )
         .order_by(User.full_name, User.email)
     )
+
+    # Managers see only members of their own team.
+    if context.role == "manager":
+        if context.team_id is None:
+            return []
+        statement = statement.where(TenantMembership.team_id == context.team_id)
 
     rows = session.execute(statement).all()
     return [_serialize_user(user, membership) for user, membership in rows]

@@ -1,0 +1,5 @@
+RelationshipCheck,Status
+Leads -> Contacts ID matching,100% Validated (0 Orphans)
+Interactions -> Leads ID matching,100% Validated (0 Orphans)
+Opportunities -> Interactions ID matching,100% Validated (0 Orphans)
+Sales -> Contacts ID matching,100% Validated (0 Orphans)

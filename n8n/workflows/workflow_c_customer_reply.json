@@ -1,0 +1,202 @@
+{
+  "name": "Workflow C: Customer Reply Orchestration",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-replied",
+        "responseMode": "onReceived",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "1",
+      "name": "Webhook lead.replied",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "lead-replied"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nconst item = $input.first();\nconst headers = item.json.headers || {};\nconst rawBody = item.json.rawBody || JSON.stringify(item.json.body || {});\n\nconst eventId = headers['x-event-id'];\nconst timestampStr = headers['x-timestamp'];\nconst signature = headers['x-signature'];\n\nif (!signature || !timestampStr || !eventId) {\n  throw new Error('Missing required webhook verification headers');\n}\n\nconst timestamp = parseInt(timestampStr, 10);\nconst now = Math.floor(Date.now() / 1000);\nif (Math.abs(now - timestamp) > 300) {\n  throw new Error('Timestamp skew exceeds 300 seconds');\n}\n\nconst secret = $env.N8N_EVENT_SIGNING_SECRET || '';\nconst canonical = timestampStr + '.' + rawBody;\nconst expectedSig = 'sha256=' + crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex');\n\nif (signature !== expectedSig) {\n  throw new Error('Invalid X-Signature');\n}\n\nconst parsed = typeof item.json.body === 'object' ? item.json.body : JSON.parse(rawBody);\nconst payload = parsed.payload || {};\nconst leadId = payload.lead_id || parsed.aggregate_id;\n\nreturn [{\n  json: {\n    event_id: eventId,\n    event_type: parsed.event_type,\n    tenant_id: parsed.tenant_id,\n    lead_id: leadId,\n    conversation_id: payload.conversation_id,\n    message_id: payload.message_id,\n    occurred_at: parsed.occurred_at\n  }\n}];"
+      },
+      "id": "2",
+      "name": "Verify Dispatcher Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "subworkflow_sign_and_call",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "method": "GET",
+            "path": "=/internal/v1/automation/leads/{{ $json.lead_id }}",
+            "tenant_id": "={{ $json.tenant_id }}",
+            "idempotency_key": "={{ $json.event_id }}-get-lead"
+          }
+        }
+      },
+      "id": "3",
+      "name": "Fetch Lead Context",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const leadResp = $input.first().json || {};\nconst lead = leadResp.data || {};\nconst event = $('Verify Dispatcher Signature').item.json;\n\nconst assignedUserId = lead.assigned_user_id;\nconst managerUserIds = lead.manager_user_ids || [];\nconst leadName = lead.name || 'Unknown';\n\nconst notifications = [];\nif (assignedUserId) {\n  notifications.push({\n    user_id: assignedUserId,\n    title: 'Customer Replied: ' + leadName,\n    body: 'Customer ' + leadName + ' replied to your message.',\n    idempotency_key: event.event_id + '-notif'\n  });\n} else {\n  for (let i = 0; i < managerUserIds.length; i++) {\n    const mgrId = managerUserIds[i];\n    notifications.push({\n      user_id: mgrId,\n      title: 'Customer Replied: ' + leadName,\n      body: 'Unassigned lead ' + leadName + ' replied to message.',\n      idempotency_key: event.event_id + '-notif-' + mgrId\n    });\n  }\n}\n\nreturn [{\n  json: {\n    event_id: event.event_id,\n    tenant_id: event.tenant_id,\n    lead_id: event.lead_id,\n    notifications: notifications,\n    has_notifications: notifications.length > 0,\n    first_notification: notifications.length > 0 ? notifications[0] : null\n  }\n}];"
+      },
+      "id": "4",
+      "name": "Resolve Notification Recipients",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.has_notifications }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "5",
+      "name": "Should Send Notification?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "subworkflow_sign_and_call",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "method": "POST",
+            "path": "/internal/v1/automation/notifications",
+            "tenant_id": "={{ $json.tenant_id }}",
+            "idempotency_key": "={{ $json.first_notification.idempotency_key }}",
+            "body": {
+              "user_id": "={{ $json.first_notification.user_id }}",
+              "type": "new_lead",
+              "title": "={{ $json.first_notification.title }}",
+              "body": "={{ $json.first_notification.body }}",
+              "entity_type": "lead",
+              "entity_id": "={{ $json.lead_id }}"
+            }
+          }
+        }
+      },
+      "id": "6",
+      "name": "Send Rep/Manager Notification",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1300, 200]
+    },
+    {
+      "parameters": {
+        "workflowId": "subworkflow_sign_and_call",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "method": "POST",
+            "path": "=/internal/v1/automation/leads/{{ $('Verify Dispatcher Signature').item.json.lead_id }}/assess",
+            "tenant_id": "={{ $('Verify Dispatcher Signature').item.json.tenant_id }}",
+            "idempotency_key": "={{ $('Verify Dispatcher Signature').item.json.event_id }}-assess",
+            "body": {}
+          }
+        }
+      },
+      "id": "7",
+      "name": "Re-run Assessment",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1520, 300]
+    }
+  ],
+  "connections": {
+    "Webhook lead.replied": {
+      "main": [
+        [
+          {
+            "node": "Verify Dispatcher Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Dispatcher Signature": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead Context": {
+      "main": [
+        [
+          {
+            "node": "Resolve Notification Recipients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Notification Recipients": {
+      "main": [
+        [
+          {
+            "node": "Should Send Notification?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Send Notification?": {
+      "main": [
+        [
+          {
+            "node": "Send Rep/Manager Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Re-run Assessment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Rep/Manager Notification": {
+      "main": [
+        [
+          {
+            "node": "Re-run Assessment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

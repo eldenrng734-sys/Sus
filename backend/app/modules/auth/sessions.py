@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -13,11 +13,43 @@ from app.core.security import (
 )
 from app.modules.auth.errors import AuthError
 from app.modules.auth.models import RefreshToken
+from app.modules.tenants.models import Tenant, TenantMembership
 from app.modules.users.models import User
 
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def list_user_memberships(
+    db: Session,
+    user_id: uuid.UUID,
+) -> list[dict[str, str | bool | None]]:
+    db.execute(
+        text("SELECT set_config('app.user_id', :user_id, true)"),
+        {"user_id": str(user_id)},
+    )
+    rows = db.execute(
+        select(TenantMembership, Tenant)
+        .join(Tenant, Tenant.id == TenantMembership.tenant_id)
+        .where(
+            TenantMembership.user_id == user_id,
+            TenantMembership.is_active.is_(True),
+            Tenant.status == "active",
+        )
+        .order_by(Tenant.name)
+    ).all()
+
+    return [
+        {
+            "tenant_id": str(membership.tenant_id),
+            "tenant_name": tenant.name,
+            "role": membership.role,
+            "team_id": str(membership.team_id) if membership.team_id else None,
+            "is_active": membership.is_active,
+        }
+        for membership, tenant in rows
+    ]
 
 
 def _new_token(

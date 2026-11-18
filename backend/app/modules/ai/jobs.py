@@ -45,7 +45,7 @@ from app.modules.ai.service import (
 
 logger = logging.getLogger("app.ai.jobs")
 
-HANDLED_EVENTS = ("lead.created", "message.received")
+HANDLED_EVENTS = ("assessment.requested", "lead.created", "message.received")
 MAX_ATTEMPTS = 5
 LEASE_SECONDS = 300  # a 'processing' row older than this is treated as abandoned
 BATCH_SIZE = 10
@@ -64,6 +64,7 @@ class ClaimedEvent:
     event_type: str
     aggregate_id: uuid.UUID
     attempts: int
+    aggregate_type: str = "lead"
 
 
 @dataclass(frozen=True)
@@ -127,7 +128,7 @@ _CLAIM_SQL = text(
            attempts = e.attempts + 1
       FROM picked
      WHERE e.id = picked.id
-    RETURNING e.id, e.tenant_id, e.event_type, e.aggregate_id, e.attempts
+    RETURNING e.id, e.tenant_id, e.event_type, e.aggregate_id, e.attempts, e.aggregate_type
     """
 )
 
@@ -159,7 +160,14 @@ def claim_batch(
         ).all()
         db.commit()
     return [
-        ClaimedEvent(r.id, r.tenant_id, r.event_type, r.aggregate_id, r.attempts)
+        ClaimedEvent(
+            r.id,
+            r.tenant_id,
+            r.event_type,
+            r.aggregate_id,
+            r.attempts,
+            getattr(r, "aggregate_type", "lead"),
+        )
         for r in rows
     ]
 
@@ -210,7 +218,9 @@ def _load(db: Session, event: ClaimedEvent) -> _Loaded | None:
     conversation_id: uuid.UUID | None = None
     since = None
 
-    if event.event_type == "message.received":
+    if event.event_type == "message.received" or (
+        event.event_type == "assessment.requested" and event.aggregate_type == "message"
+    ):
         row = db.execute(
             text(
                 """
@@ -309,10 +319,7 @@ def _run_analyzer(analyzer: Analyzer, job: JobInput) -> AnalysisResult:
             type(exc).__name__,
         )
         return _failed_result()
-    if (
-        not isinstance(result, AnalysisResult)
-        or result.status not in ("ok", "fallback", "failed")
-    ):
+    if not isinstance(result, AnalysisResult) or result.status not in ("ok", "fallback", "failed"):
         return _failed_result()
     return result
 

@@ -428,9 +428,7 @@ class MetaProvider:
                     continue
 
                 sender = item.get("sender")
-                sender_id = (
-                    str(sender.get("id") or "") if isinstance(sender, dict) else ""
-                )
+                sender_id = str(sender.get("id") or "") if isinstance(sender, dict) else ""
                 if sender_id and sender_id == page_id:
                     continue  # page echo of our own outbound message
 

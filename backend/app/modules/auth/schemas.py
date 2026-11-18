@@ -1,4 +1,9 @@
+import email_validator
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+# Allow dev/test domains (.test, .example) for local development and testing
+email_validator.TEST_ENVIRONMENT = True
+
 
 
 class SignupRequest(BaseModel):

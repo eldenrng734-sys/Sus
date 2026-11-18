@@ -15,10 +15,10 @@ def load_dataset() -> list[dict]:
 def test_ai_evaluation_dataset_shape_and_labels():
     records = load_dataset()
 
-    assert len(records) == 50
-    assert sum(record["language"] == "en" for record in records) == 25
-    assert sum(record["language"] == "bn" for record in records) == 25
-    assert len({record["id"] for record in records}) == 50
+    assert len(records) == 60
+    assert sum(record["language"] == "en" for record in records) == 30
+    assert sum(record["language"] == "bn" for record in records) == 30
+    assert len({record["id"] for record in records}) == 60
 
     messages = [" ".join(record["message"].split()).casefold() for record in records]
     assert all(messages)
@@ -55,5 +55,5 @@ def test_every_dataset_line_is_valid_json():
     with DATASET_PATH.open(encoding="utf-8") as dataset_file:
         lines = dataset_file.readlines()
 
-    assert len(lines) == 50
+    assert len(lines) == 60
     assert all(json.loads(line) for line in lines)

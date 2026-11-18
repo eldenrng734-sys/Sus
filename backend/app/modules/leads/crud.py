@@ -5,17 +5,16 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, asc, desc, func, or_, select, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import and_, asc, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.events import EventName, event_emitter
+from app.core.idempotency import claim_idempotency, store_idempotency_response
 from app.core.permissions import apply_data_scope
 from app.core.tenancy import TenantContext
 from app.modules.audit.service import record_audit_event
 from app.modules.auth.errors import AuthError
-from app.modules.idempotency.models import IdempotencyKey
 from app.modules.leads.assignment import assign_round_robin
 from app.modules.leads.models import Interaction, Lead
 from app.modules.leads.schemas import LeadCreate, LeadUpdate, NoteCreate
@@ -77,68 +76,15 @@ def _claim_create_idempotency(
     key: str,
     request_hash: str,
 ) -> tuple[uuid.UUID | None, dict[str, Any] | None]:
-    """Claim a request key, or return the previously stored response.
-
-    The PostgreSQL upsert also lets an expired 24-hour key be safely reused.
-    A concurrent request with the same key waits on the unique index and then
-    observes the first request's committed response.
-    """
-    now = datetime.now(UTC)
-    statement = (
-        pg_insert(IdempotencyKey)
-        .values(
-            tenant_id=ctx.tenant_id,
-            caller_type="user",
-            caller_id=str(ctx.user_id),
-            method="POST",
-            path=CREATE_LEAD_PATH,
-            key=key,
-            request_hash=request_hash,
-            expires_at=now + IDEMPOTENCY_TTL,
-        )
-        .on_conflict_do_update(
-            constraint="uq_idempotency_keys_scope",
-            set_={
-                "request_hash": request_hash,
-                "response_status": None,
-                "response_body": None,
-                "expires_at": now + IDEMPOTENCY_TTL,
-            },
-            where=IdempotencyKey.expires_at <= func.now(),
-        )
-        .returning(IdempotencyKey.id)
+    """Claim a request key, or return the previously stored response."""
+    return claim_idempotency(
+        session,
+        tenant_id=ctx.tenant_id,
+        user_id=ctx.user_id,
+        path=CREATE_LEAD_PATH,
+        key=key,
+        request_hash=request_hash,
     )
-    claimed_id = session.scalar(statement)
-    if claimed_id is not None:
-        return claimed_id, None
-
-    existing = session.scalar(
-        select(IdempotencyKey)
-        .where(
-            IdempotencyKey.tenant_id == ctx.tenant_id,
-            IdempotencyKey.caller_type == "user",
-            IdempotencyKey.caller_id == str(ctx.user_id),
-            IdempotencyKey.method == "POST",
-            IdempotencyKey.path == CREATE_LEAD_PATH,
-            IdempotencyKey.key == key,
-        )
-        .with_for_update()
-    )
-    if existing is None:
-        raise AuthError(409, "idempotency_conflict", "Could not claim this idempotency key")
-    if existing.request_hash != request_hash:
-        raise AuthError(
-            409,
-            "idempotency_conflict",
-            "This idempotency key was already used with a different request",
-        )
-    if existing.response_status is None or existing.response_body is None:
-        raise AuthError(
-            409,
-            "idempotency_in_progress",
-            "A request with this idempotency key is still being processed",
-        )
-    return None, existing.response_body
 
 
 def _store_create_response(
@@ -146,14 +92,7 @@ def _store_create_response(
     idempotency_id: uuid.UUID,
     response_body: dict[str, Any],
 ) -> None:
-    encoded = json.dumps(response_body, separators=(",", ":"), default=str).encode("utf-8")
-    if len(encoded) > 64 * 1024:
-        raise AuthError(500, "internal_error", "Idempotent response exceeded the storage limit")
-    session.execute(
-        update(IdempotencyKey)
-        .where(IdempotencyKey.id == idempotency_id)
-        .values(response_status=201, response_body=response_body)
-    )
+    store_idempotency_response(session, idempotency_id, response_body)
 
 
 def _get_scoped(
@@ -605,8 +544,10 @@ def get_lead(
             {
                 "id": str(assessment.id),
                 "intent": assessment.intent,
+                "sentiment": assessment.sentiment,
                 "priority": assessment.priority,
                 "lead_score": assessment.lead_score,
+                "recommended_action": assessment.recommended_action,
                 "confidence": (
                     float(assessment.confidence) if assessment.confidence is not None else None
                 ),
