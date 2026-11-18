@@ -13,9 +13,12 @@ import {
   Plug,
   Settings,
   LogOut,
+  Sun,
+  Moon,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
+import { useTheme } from "@/providers/theme-provider";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/layout/notification-bell";
 
@@ -38,6 +41,7 @@ const navigation: NavigationItem[] = [
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user, role, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const handleLogout = async () => {
     try {
@@ -55,15 +59,17 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     .trim()
     .charAt(0)
     .toUpperCase();
+
   const displayName = user?.display_name || user?.email || "Your workspace";
+
   const roleLabel = role
     ? role.charAt(0).toUpperCase() + role.slice(1)
     : "Sales team";
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
       {/* Sidebar Logo */}
-      <div className="flex h-20 items-end border-b border-slate-100 px-4">
+      <div className="flex h-20 items-end border-b border-slate-100 px-4 dark:border-slate-700">
         <div className="relative h-16 w-full translate-y-1 overflow-hidden">
           <Image
             src="/syntrix-logo.png"
@@ -76,8 +82,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </div>
 
+      {/* Navigation */}
       <div className="px-4 pt-7">
-        <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
           Workspace
         </p>
 
@@ -91,11 +98,12 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 key={item.href}
                 href={item.href}
                 onClick={onNavigate}
-                className={`flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors ${
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors",
                   active
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
+                    ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                )}
               >
                 <Icon size={19} />
                 {item.label}
@@ -105,25 +113,60 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </nav>
       </div>
 
-      <div className="mt-auto border-t border-slate-100 p-4">
-        <div className="mb-4 flex items-center justify-between rounded-lg bg-slate-50 p-2.5">
+      {/* Bottom Section */}
+      <div className="mt-auto border-t border-slate-100 p-4 dark:border-slate-700">
+        {/* User Profile */}
+        <div className="mb-4 flex items-center justify-between rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-100">
               {initial}
             </div>
+
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-800">
+              <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                 {displayName}
               </p>
-              <p className="text-xs text-slate-500 capitalize">{roleLabel}</p>
+
+              <p className="text-xs capitalize text-slate-500 dark:text-slate-400">
+                {roleLabel}
+              </p>
             </div>
           </div>
+
           <NotificationBell />
         </div>
 
+        {/* Theme Toggle */}
         <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={
+            theme === "dark"
+              ? "Switch to light mode"
+              : "Switch to dark mode"
+          }
+          className="mb-2 flex w-full items-center justify-between rounded-lg px-3 py-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+        >
+          <span className="flex items-center gap-3">
+            {theme === "dark" ? (
+              <Sun size={18} />
+            ) : (
+              <Moon size={18} />
+            )}
+
+            {theme === "dark" ? "Light Mode" : "Dark Mode"}
+          </span>
+
+          <span className="text-xs text-slate-400 dark:text-slate-500">
+            {theme === "dark" ? "On" : "Off"}
+          </span>
+        </button>
+
+        {/* Sign Out */}
+        <button
+          type="button"
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-slate-600 transition hover:bg-red-50 hover:text-red-600"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-slate-600 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-slate-300 dark:hover:bg-red-950/40 dark:hover:text-red-400"
         >
           <LogOut size={18} />
           Sign out
@@ -147,7 +190,7 @@ function MobileMenuButton({
       aria-label={open ? "Close navigation menu" : "Open navigation menu"}
       aria-expanded={open}
       aria-controls="mobile-navigation"
-      className="flex size-11 items-center justify-center rounded-xl border border-slate-200/90 bg-white/90 text-slate-700 shadow-sm backdrop-blur-sm transition-[background-color,box-shadow,transform] duration-200 ease-out hover:bg-white hover:text-slate-900 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100"
+      className="flex size-11 items-center justify-center rounded-xl border border-slate-200/90 bg-white/90 text-slate-700 shadow-sm backdrop-blur-sm transition-[background-color,box-shadow,transform] duration-200 ease-out hover:bg-white hover:text-slate-900 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 focus-visible:ring-offset-2 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
     >
       <span
         aria-hidden="true"
@@ -159,12 +202,14 @@ function MobileMenuButton({
             open && "translate-y-[7px] rotate-45"
           )}
         />
+
         <span
           className={cn(
             "h-0.5 w-5 rounded-full bg-current transition-all duration-300 ease-out motion-reduce:transition-none",
             open ? "opacity-0" : "opacity-100"
           )}
         />
+
         <span
           className={cn(
             "h-0.5 w-5 origin-center rounded-full bg-current transition-all duration-300 ease-out motion-reduce:transition-none",
@@ -193,6 +238,7 @@ export function Sidebar() {
     if (!mobileOpen) return;
 
     const desktopQuery = window.matchMedia("(min-width: 768px)");
+
     const handleDesktop = () => {
       if (desktopQuery.matches) setMobileOpen(false);
     };
@@ -229,6 +275,7 @@ export function Sidebar() {
     if (!mobileOpen) return;
 
     const previouslyFocused = document.activeElement as HTMLElement | null;
+
     drawerRef.current?.focus({ preventScroll: true });
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -280,10 +327,12 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="hidden min-h-screen w-64 shrink-0 border-r border-slate-200 bg-white md:block">
+      {/* Desktop Sidebar */}
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 self-start border-r border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 md:block">
         <SidebarContent />
       </aside>
 
+      {/* Mobile Menu Button */}
       <div className="fixed right-4 top-4 z-[60] md:hidden">
         <MobileMenuButton
           open={mobileOpen}
@@ -291,6 +340,7 @@ export function Sidebar() {
         />
       </div>
 
+      {/* Mobile Backdrop */}
       <div
         aria-hidden="true"
         onClick={closeMobileNav}
@@ -300,6 +350,7 @@ export function Sidebar() {
         )}
       />
 
+      {/* Mobile Sidebar Drawer */}
       <aside
         id="mobile-navigation"
         ref={drawerRef}
@@ -310,7 +361,7 @@ export function Sidebar() {
         inert={!mobileOpen}
         tabIndex={-1}
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-72 max-w-[calc(100vw-4.5rem)] overflow-y-auto overscroll-contain bg-white shadow-2xl outline-none transition-transform duration-300 ease-out md:hidden motion-reduce:transition-none",
+          "fixed inset-y-0 left-0 z-50 w-72 max-w-[calc(100vw-4.5rem)] overflow-y-auto overscroll-contain bg-white shadow-2xl outline-none transition-transform duration-300 ease-out dark:bg-slate-900 md:hidden motion-reduce:transition-none",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
