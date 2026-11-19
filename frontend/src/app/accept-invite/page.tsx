@@ -1,8 +1,9 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
+import { tenantStore } from "@/lib/auth/tenant";
 
 type AcceptResponse = {
   user_id: string;
@@ -38,16 +39,19 @@ export default function AcceptInvitePage() {
     setLoading(true);
 
     try {
-      const result = await apiFetch<AcceptResponse>("/invitations/accept", {
+      const response = await apiRequest<{ data: AcceptResponse }>("/invitations/accept", {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           token,
           full_name: fullName || null,
           password: password || null,
-        }),
+        },
+        auth: false,
+        tenantScoped: false,
       });
 
-      localStorage.setItem("tenant_id", result.tenant_id);
+      const result = response.data;
+      tenantStore.set(result.tenant_id);
       setSuccess(`Invitation accepted. Your role is ${result.role}. Redirecting to login...`);
       setTimeout(() => router.push("/login"), 2000);
     } catch (err) {

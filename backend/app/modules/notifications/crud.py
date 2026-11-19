@@ -111,3 +111,81 @@ def store_accepted_response(session: Session, idempotency_id: uuid.UUID) -> None
         .where(IdempotencyKey.id == idempotency_id)
         .values(response_status=202, response_body={})
     )
+
+
+def list_notifications(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+    read: bool | None = None,
+    limit: int = 50,
+) -> list[Notification]:
+    stmt = select(Notification).where(
+        Notification.tenant_id == tenant_id,
+        Notification.user_id == user_id,
+    )
+    if read is False:
+        stmt = stmt.where(Notification.read_at.is_(None))
+    elif read is True:
+        stmt = stmt.where(Notification.read_at.is_not(None))
+
+    stmt = stmt.order_by(Notification.created_at.desc()).limit(limit)
+    return list(session.scalars(stmt).all())
+
+
+def count_unread(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> int:
+    stmt = select(func.count(Notification.id)).where(
+        Notification.tenant_id == tenant_id,
+        Notification.user_id == user_id,
+        Notification.read_at.is_(None),
+    )
+    return session.scalar(stmt) or 0
+
+
+def mark_read(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+    notification_id: uuid.UUID,
+) -> Notification | None:
+    notification = session.scalar(
+        select(Notification).where(
+            Notification.tenant_id == tenant_id,
+            Notification.user_id == user_id,
+            Notification.id == notification_id,
+        )
+    )
+    if notification is None:
+        return None
+    if notification.read_at is None:
+        notification.read_at = datetime.now(UTC)
+        session.flush()
+    return notification
+
+
+def mark_all_read(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> int:
+    now = datetime.now(UTC)
+    result = session.execute(
+        update(Notification)
+        .where(
+            Notification.tenant_id == tenant_id,
+            Notification.user_id == user_id,
+            Notification.read_at.is_(None),
+        )
+        .values(read_at=now)
+    )
+    session.flush()
+    return result.rowcount or 0
+

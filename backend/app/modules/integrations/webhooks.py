@@ -19,7 +19,6 @@ import hmac
 import json
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -28,7 +27,6 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.events import EventName, event_emitter
 from app.modules.auth.errors import AuthError
 from app.modules.integrations import meta as _meta_init  # noqa: F401
 from app.modules.integrations import whatsapp as _wa_init  # noqa: F401

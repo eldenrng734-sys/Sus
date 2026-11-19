@@ -47,4 +47,3 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute("DROP FUNCTION IF EXISTS resolve_integration(text, text);")
-

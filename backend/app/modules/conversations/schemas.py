@@ -22,6 +22,9 @@ class ConversationOut(BaseModel):
     last_message_at: datetime | None
     last_inbound_at: datetime | None
     created_at: datetime
+    lead_name: str | None = None
+    lead_phone: str | None = None
+    lead_opted_out: bool | None = None
 
 
 class MessageOut(BaseModel):

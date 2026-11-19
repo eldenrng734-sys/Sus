@@ -158,4 +158,3 @@ class WebhookProvider(Protocol):
           - For "status" event_type, log and return without further action.
         """
         ...
-

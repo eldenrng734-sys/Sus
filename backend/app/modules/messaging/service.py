@@ -63,6 +63,34 @@ def ensure_not_opted_out(lead: Lead) -> None:
         raise AuthError(403, "opted_out", "This lead has opted out of messages")
 
 
+def ensure_task_can_send(task: Any, lead: Any) -> None:
+    """Validate that a follow-up task and its lead are in an executable state to send."""
+    if task.status in ("paused", "cancelled"):
+        raise AuthError(
+            409,
+            "task_inactive",
+            f"A {task.status} task cannot be sent",
+        )
+    if task.status != "open":
+        raise AuthError(
+            409,
+            "task_not_open",
+            f"Task status is '{task.status}', must be 'open' to send",
+        )
+    if task.requires_approval and task.approval_status != "approved":
+        raise AuthError(
+            409,
+            "approval_required",
+            "This task must be approved before sending",
+        )
+    if getattr(lead, "status", None) in ("won", "lost"):
+        raise AuthError(
+            409,
+            "lead_closed",
+            f"Cannot send message for a {lead.status} lead",
+        )
+
+
 def ensure_whatsapp_conversation(conversation: Conversation) -> None:
     if conversation.channel != "whatsapp":
         raise AuthError(
@@ -445,6 +473,20 @@ async def send_message(
     ensure_not_opted_out(lead)
     ensure_whatsapp_conversation(conversation)
 
+    if body.task_id is not None:
+        from app.database import registry
+
+        Task = registry.Task
+        task = session.scalar(
+            select(Task).where(
+                Task.id == body.task_id,
+                Task.tenant_id == conversation.tenant_id,
+            )
+        )
+        if task is None:
+            raise AuthError(404, "not_found", "Task not found")
+        ensure_task_can_send(task, lead)
+
     if body.template is None:
         ensure_window_open(conversation)
 
@@ -479,6 +521,7 @@ async def send_template(
     session: Session,
     *,
     idempotency_key: str | None = None,
+    task_id: uuid.UUID | None = None,
 ) -> MessageOut:
     """Send an approved template without going through HTTP.
 
@@ -495,6 +538,20 @@ async def send_template(
 
     ensure_not_opted_out(lead)
     ensure_whatsapp_conversation(conversation)
+
+    if task_id is not None:
+        from app.database import registry
+
+        Task = registry.Task
+        task = session.scalar(
+            select(Task).where(
+                Task.id == task_id,
+                Task.tenant_id == conversation.tenant_id,
+            )
+        )
+        if task is None:
+            raise AuthError(404, "not_found", "Task not found")
+        ensure_task_can_send(task, lead)
 
     template = TemplatePayload(name=name, language=language, params=params or [])
     token, phone_number_id = _resolve_credentials(session, conversation.tenant_id)

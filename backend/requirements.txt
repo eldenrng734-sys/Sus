@@ -6,9 +6,7 @@ alembic
 pydantic>=2.0
 pydantic-settings
 psycopg[binary]
-pytest
 httpx
-ruff
 argon2-cffi
 PyJWT
 email-validator
@@ -16,4 +14,3 @@ pyotp
 cryptography
 qrcode[pil]
 python-multipart
-respx

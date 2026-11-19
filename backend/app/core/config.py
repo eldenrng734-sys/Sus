@@ -7,7 +7,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str = ""
+    worker_database_url: str = ""
     migration_database_url: str = ""
+    backup_database_url: str = ""
 
     smtp_host: str = "mailpit"
     smtp_port: int = 1025
@@ -21,7 +23,14 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     mfa_encryption_key: str = ""
     mfa_issuer: str = "AI Sales Assistant CRM"
-    n8n_service_secret: SecretStr | None = None
+    n8n_service_secret: SecretStr | None = None  # legacy alias; use service_hmac_secret
+    service_hmac_secret: SecretStr | None = None
+    n8n_event_signing_secret: SecretStr = SecretStr("")
+    n8n_webhook_url: str = "http://localhost:5678/webhook"
+    n8n_dispatcher_batch_size: int = 10
+    n8n_dispatcher_poll_seconds: float = 2.0
+    n8n_dispatcher_lease_seconds: float = 300.0
+    n8n_dispatcher_max_attempts: int = 5
     openai_api_key: SecretStr | None = None
     openai_model: str = "gpt-4o-mini"
     openai_timeout_seconds: float = Field(default=30, gt=0, le=120)
@@ -42,7 +51,7 @@ class Settings(BaseSettings):
     # HMAC key for all Meta webhook signatures (X-Hub-Signature-256).
     meta_app_secret: SecretStr = SecretStr("")
     # Token compared against hub.verify_token in GET handshake challenges.
-    webhook_verify_token: SecretStr = SecretStr("")
+    whatsapp_verify_token: SecretStr = SecretStr("")
     # Graph API version — set in env, never hardcoded in business logic.
     meta_graph_version: str = "v21.0"
     meta_graph_timeout_seconds: float = 10.0
@@ -71,3 +80,12 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+if settings.app_env.lower() in {"development", "dev", "local", "test"}:
+    try:
+        import email_validator
+
+        email_validator.TEST_ENVIRONMENT = True
+    except ImportError:
+        pass
+

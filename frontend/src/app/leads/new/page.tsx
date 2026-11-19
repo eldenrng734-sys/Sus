@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { apiRequest, createIdempotencyKeyForAction } from "@/lib/api";
 
 export default function NewLeadPage() {
   const router = useRouter();
@@ -45,11 +45,12 @@ export default function NewLeadPage() {
 
     setLoading(true);
     try {
-      const lead = await apiFetch<{ id: string }>("/leads", {
+      const response = await apiRequest<{ data: { id: string } }>("/leads", {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: payload,
+        idempotencyKey: createIdempotencyKeyForAction(),
       });
-      router.push(`/leads/${lead.id}`);
+      router.push(`/leads/${response.data.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create lead");
     } finally {

@@ -32,19 +32,22 @@ def test_too_many_rows_is_rejected():
     with pytest.raises(AuthError):
         parse_csv(data.encode())
 
+
 def test_import_mapping_preserves_campaign_external_id_and_requirement():
     from app.modules.leads.csv_import import _to_lead
 
-    body = _to_lead({
-        "name": "Rahim Uddin",
-        "email": "rahim@example.com",
-        "phone": "",
-        "company_name": "ABC Traders",
-        "source_campaign": "Eid Offer 2026",
-        "external_id": "EXT-1001",
-        "consent": "yes",
-        "requirement": "Needs CRM for 20-person sales team",
-    })
+    body = _to_lead(
+        {
+            "name": "Rahim Uddin",
+            "email": "rahim@example.com",
+            "phone": "",
+            "company_name": "ABC Traders",
+            "source_campaign": "Eid Offer 2026",
+            "external_id": "EXT-1001",
+            "consent": "yes",
+            "requirement": "Needs CRM for 20-person sales team",
+        }
+    )
 
     assert body.source == "csv"
     assert body.source_campaign == "Eid Offer 2026"
@@ -56,11 +59,13 @@ def test_import_mapping_preserves_campaign_external_id_and_requirement():
 def test_import_mapping_accepts_false_consent():
     from app.modules.leads.csv_import import _to_lead
 
-    body = _to_lead({
-        "name": "Karim",
-        "email": "karim@example.com",
-        "consent": "no",
-    })
+    body = _to_lead(
+        {
+            "name": "Karim",
+            "email": "karim@example.com",
+            "consent": "no",
+        }
+    )
 
     assert body.consent is False
 
@@ -69,11 +74,13 @@ def test_import_mapping_rejects_unknown_consent():
     from app.modules.leads.csv_import import _to_lead
 
     with pytest.raises(AuthError) as exc:
-        _to_lead({
-            "name": "Karim",
-            "email": "karim@example.com",
-            "consent": "maybe",
-        })
+        _to_lead(
+            {
+                "name": "Karim",
+                "email": "karim@example.com",
+                "consent": "maybe",
+            }
+        )
 
     assert exc.value.code == "invalid_consent"
 

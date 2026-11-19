@@ -186,9 +186,7 @@ def _leadgen_route(
         field_data.append({"name": "phone_number", "values": [phone]})
     field_data.append({"name": "budget", "values": ["20 seats"]})
 
-    return respx_mock.get(
-        path__regex=rf"^/v\d+\.\d+/{leadgen_id}$"
-    ).respond(
+    return respx_mock.get(path__regex=rf"^/v\d+\.\d+/{leadgen_id}$").respond(
         200,
         json={
             "field_data": field_data,
@@ -485,14 +483,20 @@ def test_same_messenger_contact_is_separate_per_tenant(
 ):
     sender_id = str(uuid.uuid4().int)
 
-    assert _post(
-        hook_client,
-        _messenger_body(meta_account, sender_id, "m." + uuid.uuid4().hex),
-    ).status_code == 200
-    assert _post(
-        hook_client,
-        _messenger_body(meta_account_b, sender_id, "m." + uuid.uuid4().hex),
-    ).status_code == 200
+    assert (
+        _post(
+            hook_client,
+            _messenger_body(meta_account, sender_id, "m." + uuid.uuid4().hex),
+        ).status_code
+        == 200
+    )
+    assert (
+        _post(
+            hook_client,
+            _messenger_body(meta_account_b, sender_id, "m." + uuid.uuid4().hex),
+        ).status_code
+        == 200
+    )
 
     with Session(admin_engine) as session:
         set_tenant(session, seed.a.id)

@@ -585,6 +585,7 @@ Route ordering: declare static paths before parameterized paths (`GET /tasks/due
 | POST | `/internal/v1/automation/tasks/{task_id}/result` | Internal | n8n | Record follow-up result |
 | POST | `/internal/v1/automation/messages` | Internal | n8n | Send approved message |
 | POST | `/internal/v1/automation/notifications` | Internal | n8n | Notify a rep |
+| POST | `/internal/v1/automation/errors` | Internal | n8n | Report an automation error |
 | GET | `/internal/v1/automation/health` | Internal | n8n | Internal readiness |
 | GET | `/health` | Public | — | Liveness |
 | GET | `/health/ready` | Public | — | Readiness (DB) |
@@ -882,7 +883,7 @@ Requires access token.
 }
 ```
 
-Rules: 7-day expiry, single-use token, email must match at acceptance, admin cannot invite a `platform_admin`, and the last active company admin cannot be removed or demoted.
+Rules: 7-day expiry, single-use token, email must match at acceptance, admin cannot invite a `platform_admin`, and the last active company admin cannot be removed or demoted. `POST /api/v1/memberships/{id}/deactivate` revokes all live refresh tokens for the deactivated user immediately. `PATCH /api/v1/memberships/{id}/role` is audited with `action=membership.role_changed` and records `old_role`/`new_role` in `details`.
 
 `GET /api/v1/invitations?status=pending` (admin) returns a paginated list.
 
@@ -905,11 +906,33 @@ Existing user: the request must include a valid access token for that same email
 
 ### 7.2 Users
 
+`GET /api/v1/users/me` — tenant-scoped profile for the authenticated user.
+
+Requires `X-Tenant-ID`. Returns the caller's profile and membership in that tenant:
+
+```json
+{
+  "data": {
+    "id": "8a7b6c5d-4e3f-2a1b-0c9d-8e7f6a5b4c3d",
+    "email": "rep@acme.example",
+    "display_name": "Rahim Uddin",
+    "role": "rep",
+    "team_id": null,
+    "is_active": true,
+    "tenant_timezone": "Asia/Dhaka"
+  }
+}
+```
+
+`tenant_timezone` defaults to `"Asia/Dhaka"` until step #9 adds configurable `tenant_settings`. `PATCH /api/v1/users/me` accepts only `display_name`; `role`, `email` and `tenant_id` are rejected with `422`.
+
 `GET /api/v1/users?role=rep&team_id=<uuid>&is_active=true&cursor=<cursor>&limit=25`
 
 - Admin: all users in the tenant.
 - Manager: users in their team(s).
-- Rep: only self.
+- Rep: 403 (use `GET /users/me` instead).
+
+Scope rules: manager sees only members of their own team. Rep gets `403 forbidden`; they should call `GET /users/me`.
 
 Response items include user plus membership:
 
@@ -1268,9 +1291,9 @@ Returns open follow-up tasks due before the given time for the caller's scope. T
 }
 ```
 
-`decision`: `approve | reject`. Only tasks with `requires_approval = true` and `approval_status = pending` can be acted on. The assigned rep may approve their own permitted follow-ups; managers/admins may approve within scope. `200 OK`. `409 invalid_approval_state` otherwise. The decision is audited.
+`decision`: `approve | reject` (or dedicated `/approve` and `/reject` endpoints). Only tasks with `requires_approval = true` and `approval_status = pending` can be acted on. Manager approves own team, admin any, rep never (returns `403 forbidden`). `200 OK`. `409 invalid_approval_state` otherwise. The decision is audited and schedules `task.due` with `available_at = max(now, due_at)`.
 
-Approval does **not** bypass consent, opt-out, quiet hours, or the lead status check.
+Approval does **not** bypass consent, opt-out, quiet hours, or the lead status check. Open tasks for closed leads (`won` or `lost`), or in `paused` / `cancelled` state, cannot be sent.
 
 ---
 
@@ -1498,6 +1521,7 @@ Base: `/api/v1/platform`. Requires a platform-admin access token and MFA; compan
 | --- | --- | --- |
 | GET | `/platform/tenants` | List tenants with status and usage summary |
 | GET | `/platform/tenants/{id}` | Tenant summary |
+| POST | `/platform/tenants/{id}/suspend` | Set status to `suspended`; audited |
 | PATCH | `/platform/tenants/{id}` | Set `active` or `suspended` |
 | GET | `/platform/health` | Platform health summary |
 
@@ -1506,6 +1530,41 @@ Rules:
 - Platform admins cannot read tenant leads, messages, or credentials through these endpoints.
 - Any support access to tenant data must be a separate, time-limited, approved grant with audit logging. It is not part of the normal tenant API and requires security approval before implementation.
 - Suspending a tenant blocks tenant API access (`403 tenant_suspended`) but preserves data for export/restore.
+
+### 13.3 Tenant settings API
+
+`GET /api/v1/settings/automation` (admin only)
+
+Returns automation configuration for the authenticated tenant.
+
+`200 OK`
+```json
+{
+  "data": {
+    "timezone": "Asia/Dhaka",
+    "quiet_hours_start": "21:00",
+    "quiet_hours_end": "09:00"
+  }
+}
+```
+
+`PUT /api/v1/settings/automation` (admin only, audited)
+
+Updates automation configuration for the authenticated tenant.
+
+```json
+{
+  "timezone": "Asia/Dhaka",
+  "quiet_hours_start": "22:00",
+  "quiet_hours_end": "08:00"
+}
+```
+
+Rules:
+- Non-admin callers (rep, manager) receive `403 forbidden`.
+- `timezone` must be a valid IANA timezone name; otherwise `422 validation_error`.
+- `quiet_hours_start` and `quiet_hours_end` must be valid `HH:MM` 24-hour time strings (`00:00` to `23:59`); otherwise `422 validation_error`.
+- Every update is recorded in `audit_logs` with action `settings.automation_updated`.
 
 ---
 
@@ -1555,20 +1614,57 @@ SHA256(raw_body)
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/internal/v1/automation/leads/{lead_id}` | Lead + latest assessment + owner/team context |
-| POST | `/internal/v1/automation/leads/{lead_id}/assess` | Request an AI assessment (202) |
-| POST | `/internal/v1/automation/leads/{lead_id}/assign` | Assign lead and optionally create a task |
-| GET | `/internal/v1/automation/tasks/due?due_before=&limit=100` | Due follow-ups for the tenant |
-| POST | `/internal/v1/automation/tasks/{task_id}/result` | Record follow-up result |
-| POST | `/internal/v1/automation/messages` | Send an approved message |
-| POST | `/internal/v1/automation/notifications` | Notify a rep |
 | GET | `/internal/v1/automation/health` | Internal readiness |
+| GET | `/internal/v1/automation/leads/{lead_id}` | Lead context (name, status, assigned_user_id, team_id, opted_out; no contact details) |
+| POST | `/internal/v1/automation/leads/{lead_id}/assess` | Request an AI assessment if missing or failed (202/200) |
+| POST | `/internal/v1/automation/messages` | Send an approved message through messaging pipeline (202) |
+| POST | `/internal/v1/automation/tasks/{task_id}/result` | Record follow-up outcome (200) |
+| POST | `/internal/v1/automation/notifications` | Notify a rep (202) |
+| POST | `/internal/v1/automation/errors` | Report workflow execution error (audit logged; zero payload) (202) |
 
-There is deliberately **no** internal endpoint that lists all leads, all messages, or raw tenant data. Every endpoint requires a specific resource ID and verifies it belongs to `X-Tenant-ID`.
+*(Note on architecture reconciliation: Previous draft endpoints `POST .../assign` and `GET .../tasks/due` are omitted. Lead capture performs deterministic assignment, and follow-ups are pushed proactively via `task.due` outbox events dispatched to n8n, strictly eliminating all list-all routes.)*
 
-**Ownership (resolves an open question in `SECURITY.md`):** the FastAPI capture service owns lead creation, the initial AI assessment job, and deterministic assignment. n8n Workflow A is orchestration only: it fetches the lead, checks whether an assessment already exists, requests one only if missing or failed, and ensures a task/notification exists. It must **not** reassign an already assigned lead or create a duplicate task. `POST .../assign` and `POST .../assess` are idempotent and return the existing result when the requested action is already satisfied.
+There is deliberately **no** internal endpoint that lists all leads, all messages, or raw tenant data. Every endpoint requires a specific resource ID and verifies it belongs to `X-Tenant-ID`. If a resource belongs to another tenant or does not exist, it returns `404 not_found` (never `403`, preventing ID enumeration).
+
+**Ownership (resolves an open question in `SECURITY.md`):** the FastAPI capture service owns lead creation, the initial AI assessment job, and deterministic assignment. n8n Workflow A is orchestration only: it fetches the lead, checks whether an assessment already exists, requests one only if missing or failed, and ensures a notification exists. It must **not** reassign an already assigned lead or create a duplicate task. `POST .../assess` is idempotent and returns the existing result when the requested action is already satisfied.
+
+Example: get lead context:
+
+`GET /internal/v1/automation/leads/{lead_id}`
+
+`200 OK`
+```json
+{
+  "data": {
+    "id": "3d9f6f9a-5c4a-4f6c-9e74-0a7d2f1b8c11",
+    "name": "Ayesha Rahman",
+    "status": "new",
+    "assigned_user_id": "8a7b6c5d-4e3f-2a1b-0c9d-8e7f6a5b4c3d",
+    "team_id": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+    "opted_out": false
+  }
+}
+```
+Contains no contact details (no email, phone, or raw message content).
+
+Example: request assessment:
+
+`POST /internal/v1/automation/leads/{lead_id}/assess`
+
+`202 Accepted`
+```json
+{
+  "data": {
+    "status": "requested",
+    "lead_id": "3d9f6f9a-5c4a-4f6c-9e74-0a7d2f1b8c11"
+  }
+}
+```
+If an assessment already exists and is not failed, returns `200 OK` with `{"data": {"status": "satisfied", "lead_id": "...", "assessment_id": "..."}}`.
 
 Example: record a follow-up result
+
+`POST /internal/v1/automation/tasks/{task_id}/result`
 
 ```json
 {
@@ -1579,9 +1675,11 @@ Example: record a follow-up result
 }
 ```
 
-`status`: `sent | failed | skipped | needs_approval`. A failed result must include a non-sensitive `error_code`; never include provider tokens or full payloads. The endpoint is idempotent by task ID + idempotency key.
+`status`: `sent | failed | skipped | needs_approval`. A failed result may carry `"retryable": true`, which causes the backend to emit ONE retry `task.due` outbox event at `now + 10 minutes`. Never include provider tokens or full payloads. The endpoint is idempotent by task ID + idempotency key.
 
 Send an approved message:
+
+`POST /internal/v1/automation/messages`
 
 ```json
 {
@@ -1591,7 +1689,19 @@ Send an approved message:
 }
 ```
 
-`202 Accepted`; the same consent/opt-out/quiet-hours rules as the user-facing message endpoint still apply. `409 approval_required` if the task is not approved.
+Re-checks at send time: task is open (not paused, cancelled or done), approval satisfied, lead not opted out and not won or lost, consent exists, 24-hour window open, not quiet hours.
+- If in quiet hours: in one transaction moves task `due_at` to the end of the quiet hours window (task stays open), cancels previous pending `task.due` event, emits a new `task.due` outbox row with `available_at = new_due_at`, and returns `202 Accepted`:
+  ```json
+  {
+    "data": {
+      "status": "rescheduled",
+      "reason": "quiet_hours",
+      "available_at": "2026-11-19T03:00:00Z"
+    }
+  }
+  ```
+- If sent: `202 Accepted` returning `{"data": {"status": "sent", "message_id": "..."}}`.
+- Errors: `403 opted_out`, `403 consent_required`, `404 not_found`, `409 task_inactive`, `409 task_not_open`, `409 approval_required`, `409 lead_closed`, `409 window_closed`.
 
 Notify a rep:
 
@@ -1609,6 +1719,8 @@ Notify a rep:
 `202 Accepted`. Notification bodies must not contain credentials, tokens, or full message histories.
 
 For `POST /internal/v1/automation/notifications`, the raw request body is limited to 16 KiB. The only supported `type` is `new_lead` and the only supported `entity_type` is `lead`. `title` must be 1–200 characters and `body` 1–2000 characters after trimming whitespace; both must be non-empty. The recipient must be an active Rep in the authenticated tenant and must currently own the referenced lead. Tenant, recipient and lead are validated server-side under the authenticated tenant context. Unknown fields or unsupported types are rejected with `422`; oversized bodies return `413`; an inactive/non-Rep recipient or lead ownership mismatch returns `403`; a tenant or lead not found within the tenant returns `404`; same key with a different body returns `409`. Authentication failures return `401`; an unconfigured service secret returns `503`. Success is `202 Accepted` with no response body.
+
+For `POST /internal/v1/automation/errors`, n8n reports workflow execution failures. Accepted payload fields: `workflow_id` (string, max 100), `workflow_name` (optional string, max 200), `node_name` (optional string, max 200), `error_class` (string, max 200), `error_message` (optional string, max 500). Raw customer data, message contents, and request/response payloads must never be sent or logged. The error is written to `audit_logs` under `action = 'automation.error'` and `actor_type = 'automation'`. Idempotent on `X-Idempotency-Key`. Returns `202 Accepted` with `{"data": {"status": "recorded"}}`.
 
 ### 14.3 FastAPI → n8n event contract
 

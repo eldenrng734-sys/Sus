@@ -3,6 +3,10 @@ CRM/
 .venv/
 venv/
 env/
+backstore/
+salesman/
+backend/backstore/
+backend/salesman/
 
 # Python bytecode
 __pycache__/

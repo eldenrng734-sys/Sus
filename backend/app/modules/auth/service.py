@@ -123,7 +123,7 @@ def login(
     email = body.email.strip().lower()
 
     # Provisional limits; confirm these thresholds before production.
-    window_minutes = 15
+    window_minutes = 1
     max_email_failures = 5
     max_ip_failures = 20
 
@@ -252,6 +252,7 @@ def login(
         success=True,
     )
 
+    memberships = sessions.list_user_memberships(session, user.id)
     session.commit()
 
     data = {
@@ -265,6 +266,7 @@ def login(
             "full_name": user.full_name,
             "email_verified": True,
         },
+        "memberships": memberships,
     }
 
     return data, started["refresh_token"]

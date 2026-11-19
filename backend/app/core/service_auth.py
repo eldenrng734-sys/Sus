@@ -171,11 +171,15 @@ def _request_headers(request: Request) -> dict[str, str]:
 async def require_internal_service(request: Request) -> InternalServiceContext:
     raw_body = await _read_request_body(request)
     headers = _request_headers(request)
-    secret = settings.n8n_service_secret
+    secret = (
+        settings.n8n_service_secret
+        if settings.n8n_service_secret is not None
+        else settings.service_hmac_secret
+    )
     request.state.internal_raw_body = raw_body
     return verify_internal_request(
         headers,
-        method=request.method,
+        method=getattr(request, "method", "POST"),
         path=_request_path(request),
         raw_body=raw_body,
         secret=secret.get_secret_value() if secret is not None else None,
@@ -183,6 +187,9 @@ async def require_internal_service(request: Request) -> InternalServiceContext:
 
 
 async def _read_request_body(request: Request) -> bytes:
+    if getattr(request, "method", "POST") in ("GET", "HEAD"):
+        return b""
+
     content_lengths = [
         value for key, value in request.scope.get("headers", []) if key.lower() == b"content-length"
     ]
@@ -195,6 +202,8 @@ async def _read_request_body(request: Request) -> bytes:
                 raise ValueError("Content-Length must be a non-negative integer")
         except (UnicodeDecodeError, ValueError) as exc:
             raise AuthError(400, "bad_request", "Invalid Content-Length") from exc
+        if int(declared_length) == 0:
+            return b""
         if int(declared_length) > MAX_INTERNAL_BODY_BYTES:
             raise _body_too_large()
 

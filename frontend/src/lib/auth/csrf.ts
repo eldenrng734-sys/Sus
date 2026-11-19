@@ -4,11 +4,14 @@ function readCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
 
   const prefix = `${name}=`;
-  const item = document.cookie
-    .split("; ")
-    .find((cookie) => cookie.startsWith(prefix));
-
-  return item ? decodeURIComponent(item.slice(prefix.length)) : null;
+  const parts = document.cookie.split(";");
+  for (const rawPart of parts) {
+    const part = rawPart.trim();
+    if (part.startsWith(prefix)) {
+      return decodeURIComponent(part.slice(prefix.length));
+    }
+  }
+  return null;
 }
 
 export const csrfStore = {

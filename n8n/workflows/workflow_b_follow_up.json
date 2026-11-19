@@ -1,0 +1,161 @@
+{
+  "name": "Workflow B: Follow-up Orchestration",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "task-due",
+        "responseMode": "onReceived",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "1",
+      "name": "Webhook task.due",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "task-due"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nconst item = $input.first();\nconst headers = item.json.headers || {};\nconst rawBody = item.json.rawBody || JSON.stringify(item.json.body || {});\n\nconst eventId = headers['x-event-id'];\nconst timestampStr = headers['x-timestamp'];\nconst signature = headers['x-signature'];\n\nif (!signature || !timestampStr || !eventId) {\n  throw new Error('Missing required webhook verification headers');\n}\n\nconst timestamp = parseInt(timestampStr, 10);\nconst now = Math.floor(Date.now() / 1000);\nif (Math.abs(now - timestamp) > 300) {\n  throw new Error('Timestamp skew exceeds 300 seconds');\n}\n\nconst secret = $env.N8N_EVENT_SIGNING_SECRET || '';\nconst canonical = timestampStr + '.' + rawBody;\nconst expectedSig = 'sha256=' + crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex');\n\nif (signature !== expectedSig) {\n  throw new Error('Invalid X-Signature');\n}\n\nconst parsed = typeof item.json.body === 'object' ? item.json.body : JSON.parse(rawBody);\nconst payload = parsed.payload || {};\nconst taskId = payload.task_id || parsed.aggregate_id;\n\nreturn [{\n  json: {\n    event_id: eventId,\n    event_type: parsed.event_type,\n    tenant_id: parsed.tenant_id,\n    task_id: taskId,\n    lead_id: payload.lead_id,\n    retry_count: payload.retry_count || 0\n  }\n}];"
+      },
+      "id": "2",
+      "name": "Verify Dispatcher Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "subworkflow_sign_and_call",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "method": "POST",
+            "path": "/internal/v1/automation/messages",
+            "tenant_id": "={{ $json.tenant_id }}",
+            "idempotency_key": "={{ $json.event_id }}",
+            "body": {
+              "task_id": "={{ $json.task_id }}"
+            }
+          }
+        }
+      },
+      "id": "3",
+      "name": "Dispatch Follow-up Message",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [640, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const event = $('Verify Dispatcher Signature').item.json;\nconst sendResult = $input.first().json || {};\nconst statusCode = sendResult.statusCode || (sendResult.error ? sendResult.error.statusCode : 200);\nconst errorObj = sendResult.error || {};\nconst errorCode = (errorObj.error && errorObj.error.code) || errorObj.code || 'unknown';\n\nlet outcome = 'unknown';\nlet recordPayload = null;\nlet notificationPayload = null;\n\nif (statusCode === 200) {\n  outcome = 'sent';\n  recordPayload = {\n    status: 'sent',\n    task_status: 'done',\n    message_id: sendResult.data ? sendResult.data.message_id : null,\n    note: 'Sent automated WhatsApp follow-up.'\n  };\n} else if (statusCode === 202) {\n  outcome = 'quiet_hours';\n  // Quiet hours already rescheduled by backend; nothing more to record\n} else if (errorCode === 'approval_required') {\n  outcome = 'approval_required';\n  recordPayload = {\n    status: 'needs_approval',\n    error_code: 'approval_required'\n  };\n} else if (errorCode === 'opted_out') {\n  outcome = 'opted_out';\n  recordPayload = {\n    status: 'skipped',\n    task_status: 'cancelled',\n    error_code: 'opted_out',\n    note: 'Lead opted out; follow-up cancelled.'\n  };\n} else if (errorCode === 'window_closed') {\n  outcome = 'window_closed';\n  recordPayload = {\n    status: 'skipped',\n    error_code: 'window_closed',\n    note: '24-hour reply window closed. Manual template required.'\n  };\n} else if (errorCode === 'task_not_open' || errorCode === 'task_inactive' || errorCode === 'lead_closed') {\n  outcome = 'task_not_open';\n  recordPayload = {\n    status: 'skipped',\n    error_code: errorCode,\n    note: 'Task or lead is inactive; skipped.'\n  };\n} else {\n  outcome = 'failed';\n  const isFirstFailure = (event.retry_count || 0) < 1;\n  recordPayload = {\n    status: 'failed',\n    retryable: isFirstFailure,\n    error_code: errorCode\n  };\n}\n\nreturn [{\n  json: {\n    tenant_id: event.tenant_id,\n    task_id: event.task_id,\n    event_id: event.event_id,\n    outcome: outcome,\n    recordPayload: recordPayload,\n    notificationPayload: notificationPayload\n  }\n}];"
+      },
+      "id": "4",
+      "name": "Classify Outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.recordPayload }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "5",
+      "name": "Should Record Result?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "subworkflow_sign_and_call",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "method": "POST",
+            "path": "=/internal/v1/automation/tasks/{{ $json.task_id }}/result",
+            "tenant_id": "={{ $json.tenant_id }}",
+            "idempotency_key": "={{ $json.event_id }}-result",
+            "body": "={{ $json.recordPayload }}"
+          }
+        }
+      },
+      "id": "6",
+      "name": "Record Task Result",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1300, 200]
+    }
+  ],
+  "connections": {
+    "Webhook task.due": {
+      "main": [
+        [
+          {
+            "node": "Verify Dispatcher Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Dispatcher Signature": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Follow-up Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Follow-up Message": {
+      "main": [
+        [
+          {
+            "node": "Classify Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Outcome": {
+      "main": [
+        [
+          {
+            "node": "Should Record Result?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Record Result?": {
+      "main": [
+        [
+          {
+            "node": "Record Task Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

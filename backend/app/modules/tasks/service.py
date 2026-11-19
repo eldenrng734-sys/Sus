@@ -1,22 +1,28 @@
-
 from __future__ import annotations
 
+import hashlib
+import json
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
+from app.core.idempotency import claim_idempotency, store_idempotency_response
 from app.core.permissions import apply_data_scope
 from app.modules.audit.service import record_audit_event
 from app.modules.auth.errors import AuthError
-from app.modules.leads.models import Lead
+from app.modules.leads.models import Interaction, Lead
 from app.modules.tenants.models import TenantMembership
 from app.modules.users.models import User
 
 if TYPE_CHECKING:
-    from app.core.permissions import TenantContext
+    from sqlalchemy.orm import Session
+
     from app.modules.ai.models import LeadAssessment
     from app.modules.tasks.models import Task
+
+CREATE_TASK_PATH = "/api/v1/tasks"
 
 _FOLLOW_UP_ACTIONS = {
     "call": ("Call lead", "call", 1),
@@ -44,6 +50,24 @@ def _audit(session, context, action: str, task, details: dict | None = None):
         entity_type="task",
         entity_id=task.id,
         details=details or {},
+    )
+
+
+def _add_timeline(session, task, event_type: str, actor_user_id=None, details: dict | None = None):
+    """Write an Interaction (lead timeline) entry for a task event."""
+    session.add(
+        Interaction(
+            tenant_id=task.tenant_id,
+            lead_id=task.lead_id,
+            type=event_type,
+            source="task",
+            details={
+                "task_id": str(task.id),
+                "task_title": task.title,
+                "actor_user_id": str(actor_user_id) if actor_user_id else None,
+                **(details or {}),
+            },
+        )
     )
 
 
@@ -77,8 +101,7 @@ def _validate_assignee(session, context, lead, user_id):
         select(TenantMembership)
         .join(
             User,
-            (User.id == TenantMembership.user_id)
-            & (User.tenant_id == TenantMembership.tenant_id),
+            User.id == TenantMembership.user_id,
         )
         .where(
             TenantMembership.tenant_id == context.tenant_id,
@@ -96,6 +119,13 @@ def _validate_assignee(session, context, lead, user_id):
         )
 
 
+def _task_request_hash(body) -> str:
+    """Stable hash of the task creation body for idempotency."""
+    normalized = body.model_dump(mode="json")
+    encoded = json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def list_tasks(session, context, limit: int = 50, offset: int = 0):
     Task = _task_model()
     statement = apply_data_scope(select(Task), Task, context)
@@ -107,14 +137,63 @@ def list_tasks(session, context, limit: int = 50, offset: int = 0):
     return list(session.scalars(statement).all())
 
 
+def list_due_follow_ups(session, context, due_before: str | None = None, limit: int = 50):
+    """Return open follow_up tasks where due_at <= due_before (default: now), scoped."""
+    Task = _task_model()
+    if due_before is not None:
+        try:
+            cutoff = datetime.fromisoformat(due_before.rstrip("Z"))
+            if cutoff.tzinfo is None:
+                cutoff = cutoff.replace(tzinfo=UTC)
+        except (ValueError, AttributeError):
+            msg = "due_before must be a valid ISO-8601 datetime"
+            raise AuthError(422, "invalid_param", msg) from None
+    else:
+        cutoff = datetime.now(UTC)
+
+    statement = apply_data_scope(select(Task), Task, context).where(
+        Task.type == "follow_up",
+        Task.status == "open",
+        Task.due_at <= cutoff,
+    )
+    statement = statement.order_by(Task.due_at.asc()).limit(min(max(limit, 1), 100))
+    return list(session.scalars(statement).all())
+
+
 def get_task(session, context, task_id):
     return _get_scoped_task(session, context, task_id)
 
 
-def create_task(session, context, body):
+def create_task(session, context, body, idempotency_key: str):
+    """Create a task; return (task, is_replay).
+
+    Idempotency: a duplicate key with the same body replays the original task.
+    """
     Task = _task_model()
+    request_hash = _task_request_hash(body)
 
     try:
+        idempotency_id, replay_body = claim_idempotency(
+            session,
+            tenant_id=context.tenant_id,
+            user_id=context.user_id,
+            path=CREATE_TASK_PATH,
+            key=idempotency_key,
+            request_hash=request_hash,
+        )
+        if replay_body is not None:
+            # Return the previously-created task.
+            task_id = replay_body.get("id")
+            task = session.scalar(
+                select(Task).where(
+                    Task.tenant_id == context.tenant_id,
+                    Task.id == task_id,
+                )
+            )
+            if task is None:
+                raise AuthError(500, "internal_error", "Replayed task could not be reloaded")
+            return task, True
+
         lead = _get_scoped_lead(session, context, body.lead_id)
 
         assignee_id = body.assigned_user_id
@@ -144,9 +223,18 @@ def create_task(session, context, body):
         session.add(task)
         session.flush()
         _audit(session, context, "task.created", task, {"lead_id": str(lead.id)})
+
+        if task.type == "follow_up" and not task.requires_approval:
+            from app.modules.tasks.events import emit_task_event
+
+            emit_task_event(session, "task.due", task, available_at=task.due_at)
+
+        response_body = {"id": str(task.id)}
+        store_idempotency_response(session, idempotency_id, response_body)
+
         session.commit()
         session.refresh(task)
-        return task
+        return task, False
     except Exception:
         session.rollback()
         raise
@@ -156,6 +244,16 @@ def update_task(session, context, task_id, body):
     try:
         task = _get_scoped_task(session, context, task_id, for_update=True)
         changes = body.model_dump(exclude_unset=True)
+
+        # Optimistic version lock: client must send the version it last read.
+        if "version" in changes:
+            if changes["version"] != task.version:
+                raise AuthError(
+                    409,
+                    "version_conflict",
+                    "Task was modified by another request; reload and retry",
+                )
+            changes = {k: v for k, v in changes.items() if k != "version"}
 
         if "assigned_user_id" in changes and changes["assigned_user_id"] is not None:
             lead = _get_scoped_lead(session, context, task.lead_id)
@@ -178,6 +276,26 @@ def update_task(session, context, task_id, body):
 
         task.version += 1
         _audit(session, context, "task.updated", task, {"fields": list(changes)})
+        _add_timeline(
+            session,
+            task,
+            "task_updated",
+            actor_user_id=context.user_id,
+            details={"fields": list(changes)},
+        )
+
+        from app.modules.tasks.events import emit_task_event
+
+        if changes.get("status") in ("done", "cancelled", "paused"):
+            emit_task_event(session, "task.cancelled", task)
+        elif changes.get("status") == "open":
+            if task.type == "follow_up" and task.approval_status in ("not_required", "approved"):
+                available_at = max(datetime.now(UTC), task.due_at)
+                emit_task_event(session, "task.due", task, available_at=available_at)
+        elif "due_at" in changes and task.status == "open":
+            if task.type == "follow_up" and task.approval_status in ("not_required", "approved"):
+                emit_task_event(session, "task.due", task, available_at=task.due_at)
+
         session.commit()
         session.refresh(task)
         return task
@@ -243,6 +361,15 @@ def decide_task_approval(
 
         task.version += 1
         _audit(session, context, action, task, {"note": note})
+
+        from app.modules.tasks.events import emit_task_event
+
+        if approved:
+            available_at = max(now, task.due_at)
+            emit_task_event(session, "task.due", task, available_at=available_at)
+        else:
+            emit_task_event(session, "task.cancelled", task)
+
         session.commit()
         session.refresh(task)
         return task
@@ -251,11 +378,79 @@ def decide_task_approval(
         raise
 
 
-def create_assessment_follow_up(
+def pause_followups(
     session: Session,
-    assessment: LeadAssessment,
+    lead_id: uuid.UUID,
+    reason: str = "customer_reply",
+) -> list[Task]:
+    """Pause open follow_up tasks for a lead upon customer reply.
+
+    Call, meeting and reminder tasks are untouched.
+    Writes a timeline entry for each paused task.
+    """
+    Task = _task_model()
+    statement = select(Task).where(
+        Task.lead_id == lead_id,
+        Task.type == "follow_up",
+        Task.status == "open",
+    )
+    tasks = list(session.scalars(statement).all())
+    from app.modules.tasks.events import emit_task_event
+
+    for task in tasks:
+        task.status = "paused"
+        task.version += 1
+        _add_timeline(
+            session,
+            task,
+            "task_paused",
+            actor_user_id=None,
+            details={"reason": reason},
+        )
+        emit_task_event(session, "task.cancelled", task)
+
+    return tasks
+
+
+def cancel_followups(
+    session: Session,
+    lead_id: uuid.UUID,
+    reason: str = "opt_out",
+) -> list[Task]:
+    """Cancel open and paused follow_up tasks for a lead upon opt-out.
+
+    Call, meeting and reminder tasks are untouched.
+    Writes a timeline entry for each cancelled task.
+    """
+    Task = _task_model()
+    statement = select(Task).where(
+        Task.lead_id == lead_id,
+        Task.type == "follow_up",
+        Task.status.in_(["open", "paused"]),
+    )
+    tasks = list(session.scalars(statement).all())
+    from app.modules.tasks.events import emit_task_event
+
+    for task in tasks:
+        task.status = "cancelled"
+        task.version += 1
+        _add_timeline(
+            session,
+            task,
+            "task_cancelled",
+            actor_user_id=None,
+            details={"reason": reason},
+        )
+        emit_task_event(session, "task.cancelled", task)
+
+    return tasks
+
+
+def create_assessment_follow_up(
+    session,
+    assessment: "LeadAssessment",
     lead: Lead,
-) -> Task | None:
+) -> "Task | None":
     """Create one idempotent task for an actionable validated assessment."""
     action = assessment.recommended_action
     task_config = _FOLLOW_UP_ACTIONS.get(action or "")
@@ -284,11 +479,11 @@ def create_assessment_follow_up(
         "idempotency_key": idempotency_key,
     }
 
+    from sqlalchemy.dialects.postgresql import insert
+
     from app.database import registry
 
     task_model = registry.Task
-
-    from sqlalchemy.dialects.postgresql import insert
 
     statement = (
         insert(task_model)

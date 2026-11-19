@@ -1,19 +1,18 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  NEXT_PUBLIC_API_BASE_URL: z.string().url(),
+  NEXT_PUBLIC_API_BASE_URL: z.string().optional().default("/api/v1"),
 });
 
 const parsedEnv = envSchema.safeParse({
   NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
 });
 
-if (!parsedEnv.success) {
-  throw new Error(
-    "Invalid environment configuration: NEXT_PUBLIC_API_BASE_URL is missing or invalid."
-  );
-}
+const rawBaseUrl =
+  parsedEnv.success && parsedEnv.data.NEXT_PUBLIC_API_BASE_URL
+    ? parsedEnv.data.NEXT_PUBLIC_API_BASE_URL
+    : "/api/v1";
 
 export const env = {
-  apiBaseUrl: parsedEnv.data.NEXT_PUBLIC_API_BASE_URL.replace(/\/+$/, ""),
+  apiBaseUrl: rawBaseUrl.replace(/\/+$/, ""),
 };

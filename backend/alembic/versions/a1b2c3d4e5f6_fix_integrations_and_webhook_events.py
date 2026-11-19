@@ -102,6 +102,30 @@ def _rls_up(table: str) -> None:
     op.execute(f'GRANT SELECT, INSERT, UPDATE, DELETE ON "{table}" TO crm_app')
 
 
+def _create_webhook_lookup_policy() -> None:
+    op.execute("""
+        CREATE POLICY integrations_webhook_lookup
+        ON public.integrations
+        FOR SELECT
+        TO crm_app
+        USING (
+            provider = NULLIF(
+                current_setting('app.webhook_provider', true),
+                ''
+            )
+            AND provider_account_id = NULLIF(
+                current_setting('app.webhook_account_id', true),
+                ''
+            )
+            AND status = 'active'
+            AND (
+                expires_at IS NULL
+                OR expires_at > now()
+            )
+        )
+    """)
+
+
 # ---------------------------------------------------------------------------
 # upgrade
 # ---------------------------------------------------------------------------
@@ -185,6 +209,7 @@ def upgrade() -> None:
         op.execute("ALTER TABLE integrations ALTER COLUMN scopes SET DEFAULT '{}' ")
 
     # 6. Tighten String lengths.
+    op.execute("DROP POLICY IF EXISTS integrations_webhook_lookup ON public.integrations")
     op.alter_column(
         "integrations",
         "provider",
@@ -206,6 +231,7 @@ def upgrade() -> None:
         type_=sa.String(16),
         existing_nullable=False,
     )
+    _create_webhook_lookup_policy()
 
     # 7. Add query index.
     if not _idx_exists(conn, "ix_integrations_tenant_provider"):
@@ -444,6 +470,7 @@ def downgrade() -> None:
     if _idx_exists(conn, "ix_integrations_tenant_provider"):
         op.drop_index("ix_integrations_tenant_provider", table_name="integrations")
 
+    op.execute("DROP POLICY IF EXISTS integrations_webhook_lookup ON public.integrations")
     op.alter_column(
         "integrations",
         "status",
@@ -465,6 +492,7 @@ def downgrade() -> None:
         type_=sa.String(50),
         existing_nullable=False,
     )
+    _create_webhook_lookup_policy()
 
     scopes_type = conn.execute(
         sa.text(

@@ -37,6 +37,10 @@ class MessageSendRequest(BaseModel):
         validation_alias=AliasChoices("text", "message_text"),
     )
     template: TemplatePayload | None = None
+    task_id: uuid.UUID | None = Field(
+        default=None,
+        validation_alias=AliasChoices("task_id", "approval_task_id"),
+    )
 
     @field_validator("text")
     @classmethod

@@ -341,7 +341,8 @@ All items must be **tested**, not just implemented.
 - **Public form endpoint:** add spam protection (e.g. rate limits, honeypot or CAPTCHA).
 - **Attachments:** scan and restrict file types and sizes; serve from private storage with signed URLs.
 - **WhatsApp outbound:** messages outside the 24-hour window require pre-approved templates; enforce this in follow-up logic.
-- **Platform admin & support access:** build tenant management and the logged, temporary, approved support-access flow, since the checklist tests for it.
+- **Platform admin & support access:** build tenant management and health monitoring via `/api/v1/platform/*` (implemented in Step #25).
+- **Known Gap — Temporary Support Access Grants:** Time-bound support impersonation / support access grants (`support_access_grants` table) with company admin pre-authorization are not implemented in the MVP release. Platform administrators have access only to cross-tenant metadata, tenant suspension, and aggregate system health metrics, but have no backdoor access to customer CRM data (leads, conversations, messages, tasks). If support troubleshooting requires inspecting tenant-specific records, it must be performed with explicit company admin consent and temporary user invitation.
 
 ---
 

@@ -1,4 +1,4 @@
-﻿
+
 "use client";
 
 import Image from "next/image";
@@ -13,29 +13,52 @@ import {
   Plug,
   Settings,
   LogOut,
+  type LucideIcon,
 } from "lucide-react";
-import { logout } from "@/lib/api/auth";
+import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "@/components/layout/notification-bell";
 
-const navigation = [
+interface NavigationItem {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  roles?: ("rep" | "manager" | "admin")[];
+}
+
+const navigation: NavigationItem[] = [
   { label: "Overview", href: "/", icon: LayoutDashboard },
   { label: "Leads", href: "/leads", icon: Users },
   { label: "Tasks", href: "/tasks", icon: CheckSquare },
   { label: "Conversations", href: "/conversations", icon: MessageSquare },
-  { label: "Integrations", href: "/integrations", icon: Plug },
-  { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Integrations", href: "/integrations", icon: Plug, roles: ["admin"] },
+  { label: "Settings", href: "/settings", icon: Settings, roles: ["admin"] },
 ];
-
-async function handleLogout() {
-  try {
-    await logout();
-  } finally {
-    window.location.href = "/login";
-  }
-}
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { user, role, logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      window.location.href = "/login";
+    }
+  };
+
+  const visibleNav = navigation.filter(
+    (item) => !item.roles || (role && item.roles.includes(role))
+  );
+
+  const initial = (user?.display_name || user?.email || "U")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
+  const displayName = user?.display_name || user?.email || "Your workspace";
+  const roleLabel = role
+    ? role.charAt(0).toUpperCase() + role.slice(1)
+    : "Sales team";
 
   return (
     <div className="flex h-full flex-col bg-white">
@@ -59,7 +82,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </p>
 
         <nav className="space-y-1">
-          {navigation.map((item) => {
+          {visibleNav.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
 
@@ -83,16 +106,19 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="mt-auto border-t border-slate-100 p-4">
-        <div className="mb-4 flex items-center gap-3 rounded-lg bg-slate-50 p-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
-            U
+        <div className="mb-4 flex items-center justify-between rounded-lg bg-slate-50 p-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+              {initial}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-800">
+                {displayName}
+              </p>
+              <p className="text-xs text-slate-500 capitalize">{roleLabel}</p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-800">
-              Your workspace
-            </p>
-            <p className="text-xs text-slate-500">Sales team</p>
-          </div>
+          <NotificationBell />
         </div>
 
         <button
