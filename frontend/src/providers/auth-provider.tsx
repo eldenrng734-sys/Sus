@@ -7,6 +7,8 @@ import { tokenStore } from "@/lib/auth/token-store";
 import { tenantStore } from "@/lib/auth/tenant";
 import { getCurrentUser, logout as apiLogout, type CurrentUser } from "@/lib/api/auth";
 
+import { DEFAULT_TIMEZONE } from "@/lib/format";
+
 export type AuthContextValue = {
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -23,7 +25,7 @@ const AuthContext = createContext<AuthContextValue>({
   isAuthenticated: false,
   user: null,
   role: null,
-  timezone: "Asia/Dhaka",
+  timezone: DEFAULT_TIMEZONE,
   refresh: async () => false,
   logout: async () => {},
   selectTenant: () => {},
@@ -141,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated,
     user,
     role: user?.role ?? null,
-    timezone: user?.tenant_timezone ?? "Asia/Dhaka",
+    timezone: user?.tenant_timezone ?? DEFAULT_TIMEZONE,
     refresh: refreshAccessToken,
     logout,
     selectTenant,

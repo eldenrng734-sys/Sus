@@ -42,7 +42,7 @@ import {
 import { parseApiError } from "@/lib/api-error";
 import { ErrorBanner } from "@/components/shared/error-banner";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
-import { formatTenantDateTime } from "@/hooks/use-tasks";
+import { formatTenantDateTime, DEFAULT_TIMEZONE } from "@/lib/format";
 
 const statuses: LeadStatus[] = [
   "new",
@@ -284,9 +284,8 @@ export default function LeadDetailPage() {
               value={lead.status}
               disabled={updateLeadMutation.isPending}
               onChange={(e) => void handleStatusSelect(e.target.value as LeadStatus)}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-bold uppercase transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                statusStyles[lead.status] || "bg-slate-100 text-slate-700"
-              }`}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-bold uppercase transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${statusStyles[lead.status] || "bg-slate-100 text-slate-700"
+                }`}
             >
               {statuses.map((st) => (
                 <option key={st} value={st}>
@@ -530,7 +529,7 @@ export default function LeadDetailPage() {
                   {/* Review-state UX */}
                   <div className="border-t border-slate-100 pt-3">
                     {assessment.needs_human_review ||
-                    assessment.review_status === "pending" ? (
+                      assessment.review_status === "pending" ? (
                       <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs">
                         <div className="flex items-center gap-1.5 font-semibold text-amber-900">
                           <AlertCircle size={14} className="text-amber-600" />
@@ -650,13 +649,12 @@ export default function LeadDetailPage() {
                     return (
                       <li key={idx} className="ml-6">
                         <span
-                          className={`absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full border border-white text-xs ${
-                            isNote
-                              ? "bg-amber-100 text-amber-700"
-                              : isMessage
+                          className={`absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full border border-white text-xs ${isNote
+                            ? "bg-amber-100 text-amber-700"
+                            : isMessage
                               ? "bg-blue-100 text-blue-700"
                               : "bg-slate-100 text-slate-600"
-                          }`}
+                            }`}
                         >
                           {isNote ? (
                             <FileText size={12} />
@@ -715,11 +713,10 @@ export default function LeadDetailPage() {
               {LOST_REASONS.map((reason) => (
                 <label
                   key={reason.value}
-                  className={`flex cursor-pointer items-center justify-between rounded-xl border p-3 text-xs font-medium transition ${
-                    selectedLostReason === reason.value
-                      ? "border-red-500 bg-red-50/60 text-red-900"
-                      : "border-slate-200 text-slate-700 hover:bg-slate-50"
-                  }`}
+                  className={`flex cursor-pointer items-center justify-between rounded-xl border p-3 text-xs font-medium transition ${selectedLostReason === reason.value
+                    ? "border-red-500 bg-red-50/60 text-red-900"
+                    : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
                 >
                   <span>{reason.label}</span>
                   <input
@@ -843,11 +840,10 @@ export default function LeadDetailPage() {
                     reviewNoteModal.note
                   )
                 }
-                className={`rounded-lg px-4 py-2 text-xs font-semibold text-white disabled:opacity-50 ${
-                  reviewNoteModal.decision === "approved"
-                    ? "bg-green-600 hover:bg-green-700"
-                    : "bg-red-600 hover:bg-red-700"
-                }`}
+                className={`rounded-lg px-4 py-2 text-xs font-semibold text-white disabled:opacity-50 ${reviewNoteModal.decision === "approved"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-red-600 hover:bg-red-700"
+                  }`}
               >
                 Confirm{" "}
                 {reviewNoteModal.decision === "approved"

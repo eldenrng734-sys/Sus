@@ -35,7 +35,7 @@ import type {
   DashboardTeamResponse,
   DashboardCompanyResponse,
 } from "@/lib/api/dashboard";
-import { formatTenantDateTime } from "@/hooks/use-tasks";
+import { formatTenantDateTime, DEFAULT_TIMEZONE } from "@/lib/format";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 
 type DatePreset = "7d" | "30d" | "90d";
@@ -153,7 +153,7 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-3">
             <span className="hidden rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 sm:inline-flex">
-              Timezone: {timezone || "Asia/Dhaka"}
+              Timezone: {timezone || DEFAULT_TIMEZONE}
             </span>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
               {(user?.display_name || user?.email || "U").charAt(0).toUpperCase()}
@@ -448,8 +448,14 @@ export default function DashboardPage() {
                         </BarChart>
                       </ResponsiveContainer>
                     ) : (
-                      <div className="flex h-full items-center justify-center text-xs text-slate-400">
-                        Loading chart...
+                      <div className="flex h-full items-end justify-between gap-4 px-4 pb-4 animate-pulse">
+                        {[40, 65, 30, 85, 50, 20].map((h, i) => (
+                          <div
+                            key={i}
+                            className="flex-1 rounded-t-md bg-slate-100"
+                            style={{ height: `${h}%` }}
+                          />
+                        ))}
                       </div>
                     )}
                   </div>
