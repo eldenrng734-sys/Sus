@@ -84,11 +84,14 @@ export default function ConversationsPage() {
     }
   }, [conversations, selectedConversationId]);
 
+  // Pass undefined (not null/"null") when no conversation is selected so the
+  // hook's `enabled: Boolean(conversationId)` guard fires correctly and
+  // avoids a spurious GET /conversations/undefined/messages 422 error.
   const {
     data: messages = [],
     isLoading: isLoadingMessages,
     refetch: refetchMessages,
-  } = useMessages(selectedConversationId || undefined);
+  } = useMessages(selectedConversationId ?? undefined);
 
   const sendMessageMutation = useSendMessage();
 

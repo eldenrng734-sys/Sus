@@ -37,7 +37,9 @@ async def validate_meta_token(
     Never logs the access token. Raises AuthError(400) if validation fails.
     """
     version = settings.meta_graph_version or "v21.0"
-    url = f"{GRAPH_API_BASE}/{version}/{account_id}"
+    # Use /me?fields=id,name which works with pages_messaging scope alone.
+    # GET /{page_id} requires pages_read_engagement which may not be granted.
+    url = f"{GRAPH_API_BASE}/{version}/me"
 
     # Allow passing an existing client or using a temporary one
     should_close = False
@@ -48,6 +50,7 @@ async def validate_meta_token(
     try:
         resp = await client.get(
             url,
+            params={"fields": "id,name"},
             headers={"Authorization": f"Bearer {access_token}"},
         )
         if resp.status_code >= 400:

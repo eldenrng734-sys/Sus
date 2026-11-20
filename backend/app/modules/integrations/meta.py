@@ -359,7 +359,10 @@ class MetaProvider:
         token: str | None,
         challenge: str | None,
     ) -> str:
-        expected = settings.webhook_verify_token.get_secret_value()
+        expected = (
+            settings.meta_verify_token.get_secret_value()
+            or settings.webhook_verify_token.get_secret_value()
+        )
 
         if (
             mode == "subscribe"

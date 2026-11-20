@@ -47,7 +47,10 @@ class WhatsAppProvider:
 
         Compares the verify token in constant time. Returns the raw hub.challenge.
         """
-        expected = settings.webhook_verify_token.get_secret_value()
+        expected = (
+            settings.whatsapp_verify_token.get_secret_value()
+            or settings.webhook_verify_token.get_secret_value()
+        )
 
         if (
             mode == "subscribe"

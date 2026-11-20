@@ -1,5 +1,14 @@
 let csrfToken: string | null = null;
 
+function readStorage(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return sessionStorage.getItem("csrf_token");
+  } catch {
+    return null;
+  }
+}
+
 function readCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
 
@@ -16,14 +25,32 @@ function readCookie(name: string): string | null {
 
 export const csrfStore = {
   get(): string | null {
-    return csrfToken ?? readCookie("csrf_token");
+    return csrfToken ?? readStorage() ?? readCookie("csrf_token");
   },
 
   set(token: string | null): void {
     csrfToken = token;
+    if (typeof window !== "undefined") {
+      try {
+        if (token) {
+          sessionStorage.setItem("csrf_token", token);
+        } else {
+          sessionStorage.removeItem("csrf_token");
+        }
+      } catch {
+        // ignore
+      }
+    }
   },
 
   clear(): void {
     csrfToken = null;
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem("csrf_token");
+      } catch {
+        // ignore
+      }
+    }
   },
 };
