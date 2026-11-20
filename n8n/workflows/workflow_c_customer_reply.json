@@ -4,11 +4,7 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "lead-replied",
-        "responseMode": "onReceived",
-        "options": {
-          "rawBody": true
-        }
+        "path": "lead-replied"
       },
       "id": "1",
       "name": "Webhook lead.replied",

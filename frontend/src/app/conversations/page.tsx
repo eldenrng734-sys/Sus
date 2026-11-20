@@ -35,7 +35,7 @@ import {
 import { parseApiError } from "@/lib/api-error";
 import { ErrorBanner } from "@/components/shared/error-banner";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
-import { formatTenantDateTime } from "@/hooks/use-tasks";
+import { formatTenantDateTime } from "@/lib/format";
 
 const channels = ["All", "WhatsApp", "Messenger"];
 
@@ -488,9 +488,11 @@ export default function ConversationsPage() {
                                 {!isInbound && (
                                   <span>
                                     {msg.status === "read" ? (
-                                      <CheckCheck size={13} className="text-blue-200" />
+                                      // Double blue ticks — message was read
+                                      <CheckCheck size={13} className="text-sky-300" />
                                     ) : msg.status === "delivered" ? (
-                                      <CheckCheck size={13} className="text-blue-200" />
+                                      // Double grey ticks — delivered but not yet read
+                                      <CheckCheck size={13} className="text-blue-200/60" />
                                     ) : msg.status === "sent" ? (
                                       <Check size={13} className="text-blue-200" />
                                     ) : msg.status === "failed" ? (

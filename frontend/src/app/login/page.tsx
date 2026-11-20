@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowRight,
   LoaderCircle,
@@ -98,6 +99,9 @@ export default function LoginPage() {
     });
   }
 
+  // Collect the most recent error from any active mutation step.
+  // We show it in ONE canonical place per step — inside the active form block.
+  // The old duplicate rendering (outside all conditional blocks) is removed.
   const error =
     loginMutation.error ??
     enrollmentMutation.error ??
@@ -333,12 +337,20 @@ export default function LoginPage() {
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="password"
-                      className="mb-2 block text-sm font-medium text-slate-700"
-                    >
-                      Password
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label
+                        htmlFor="password"
+                        className="block text-sm font-medium text-slate-700"
+                      >
+                        Password
+                      </label>
+                      <Link
+                        href="/reset-password"
+                        className="text-xs font-medium text-blue-600 hover:text-blue-800 transition"
+                      >
+                        Forgot password?
+                      </Link>
+                    </div>
                     <div className="relative">
                       <LockKeyhole
                         size={18}
@@ -384,6 +396,9 @@ export default function LoginPage() {
               </>
             )}
 
+            {/* Single canonical error display — rendered after each step's form.
+                The login-step error is already rendered inside the form above.
+                For MFA / setup steps the error appears here. */}
             {(challengeToken || setupRequired) && errorMessage && (
               <p
                 role="alert"

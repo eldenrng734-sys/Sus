@@ -9,41 +9,13 @@ import {
   type TaskCreateInput,
   type TaskUpdateInput,
 } from "@/lib/api/tasks";
+import {
+  getTenantTodayString,
+  getTenantDateString,
+} from "@/lib/format";
 
-export function getTenantTodayString(timezone: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone || "Asia/Dhaka",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-  } catch {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Dhaka",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-  }
-}
-
-export function getTenantDateString(
-  isoString: string,
-  timezone: string
-): string {
-  try {
-    const date = new Date(isoString);
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone || "Asia/Dhaka",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(date);
-  } catch {
-    return isoString.slice(0, 10);
-  }
-}
+// Re-export so existing imports from "@/hooks/use-tasks" keep working.
+export { formatTenantDateTime, getTenantTodayString, getTenantDateString } from "@/lib/format";
 
 export function getTaskDayBucket(
   task: Task,
@@ -59,26 +31,6 @@ export function getTaskDayBucket(
     return "today";
   }
   return "upcoming";
-}
-
-export function formatTenantDateTime(
-  isoString: string,
-  timezone: string
-): string {
-  try {
-    const date = new Date(isoString);
-    return new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone || "Asia/Dhaka",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).format(date);
-  } catch {
-    return new Date(isoString).toLocaleDateString();
-  }
 }
 
 export function useTasks(options?: { limit?: number; offset?: number }) {

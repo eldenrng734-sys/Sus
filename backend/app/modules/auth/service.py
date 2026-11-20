@@ -123,7 +123,7 @@ def login(
     email = body.email.strip().lower()
 
     # Provisional limits; confirm these thresholds before production.
-    window_minutes = 15
+    window_minutes = 1
     max_email_failures = 5
     max_ip_failures = 20
 

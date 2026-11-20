@@ -130,7 +130,7 @@ def _check_mfa_rate_limit(session: Session, user: User, ip: str | None) -> None:
             session,
             email=user.email,
             ip_address=ip,
-            window_minutes=15,
+            window_minutes=1,
             max_email_failures=5,
             max_ip_failures=20,
         )

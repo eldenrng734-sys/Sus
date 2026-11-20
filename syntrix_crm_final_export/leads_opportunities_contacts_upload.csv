@@ -1,0 +1,288 @@
+﻿name,email,phone,source_campaign,external_id,consent,notes
+Kevin Henderson,jamesdavis@example.net,,"email_campaign, referral",C052,no,"Contact C052 | Jenniferport, Michigan, USA
+Lead L0001 [contacted; medium; email_campaign; 2025-02-05]: O0237 Negotiation $11505.56 by 2025-08-19, O0331 Closed Won $2006.43 by 2025-07-21, O0409 Prospecting $19970.24 by 2025-08-17
+Lead L0072 [qualified; high; referral; 2025-06-28]: O0091 Prospecting $17882.69 by 2025-08-25, O0172 Proposal Sent $10552.22 by 2025-07-31, O0435 Negotiation $2292.43 by 2025-07-12"
+Cynthia Howard,zsmith@example.net,3222538271,"referral, website",C077,no,"Contact C077 | Brettmouth, New York, USA
+Lead L0002 [contacted; medium; referral; 2025-04-18]: O0045 Closed Won $1164.05 by 2025-08-06, O0444 Prospecting $2057.86 by 2025-07-20
+Lead L0018 [contacted; medium; referral; 2025-01-28]: O0252 Closed Lost $1646.96 by 2025-08-28, O0254 Proposal Sent $3367.82 by 2025-08-07, O0468 Proposal Sent $12954.51 by 2025-07-28
+Lead L0185 [new; low; website; 2025-05-20]: O0081 Prospecting $18379.24 by 2025-08-19, O0246 Proposal Sent $1174.35 by 2025-09-02"
+Cynthia Morrison,john35@example.com,7923649548967,referral,C032,no,"Contact C032 | West William, Illinois, USA
+Lead L0003 [new; high; referral; 2025-07-05]: O0012 Closed Lost $14053.35 by 2025-07-22, O0119 Prospecting $6537.16 by 2025-08-04, O0275 Proposal Sent $9356.78 by 2025-07-17, O0302 Prospecting $11847.48 by 2025-09-06"
+Kenneth Bates,aaronray@example.org,15829424506,"email_campaign, other, referral",C033,no,"Contact C033 | Tapiamouth, New York, USA
+Lead L0004 [new; low; email_campaign; 2025-05-04]: O0400 Prospecting $17643.1 by 2025-09-03
+Lead L0026 [lost; low; other; 2025-06-04]: O0176 Prospecting $14054.81 by 2025-07-31, O0432 Prospecting $13029.44 by 2025-07-15
+Lead L0129 [lost; high; referral; 2025-06-27]: O0007 Closed Won $12041.72 by 2025-07-21, O0094 Closed Lost $18913.29 by 2025-08-18, O0291 Closed Lost $17928.71 by 2025-08-09, O0458 Negotiation $14299.85 by 2025-07-31
+Lead L0197 [qualified; high; referral; 2025-03-21]: O0365 Negotiation $7523.18 by 2025-07-17, O0487 Proposal Sent $13472.83 by 2025-08-21
+Lead L0200 [lost; high; email_campaign; 2025-03-28]: O0043 Negotiation $5824.1 by 2025-07-16, O0058 Negotiation $7206.92 by 2025-08-11, O0116 Prospecting $18223.44 by 2025-07-30, O0305 Closed Lost $16714.51 by 2025-08-24"
+Michael Adams,craig30@example.com,,"email_campaign, other",C080,no,"Contact C080 | Port Joshuaside, Illinois, USA
+Lead L0005 [contacted; medium; email_campaign; 2025-04-18]: O0180 Closed Won $1144.03 by 2025-07-21, O0227 Prospecting $14580.65 by 2025-08-28, O0489 Closed Won $8276.76 by 2025-07-10
+Lead L0164 [new; low; other; 2025-03-15]: O0168 Closed Lost $8842.12 by 2025-09-04, O0300 Negotiation $5545.82 by 2025-08-27"
+Julie Patrick,tinaoconnor@example.org,,other,C054,no,"Contact C054 | Petersonshire, Michigan, USA
+Lead L0006 [contacted; high; other; 2025-05-27]: O0031 Negotiation $3139.1 by 2025-07-11, O0125 Proposal Sent $14510.79 by 2025-07-17, O0296 Closed Lost $10525.7 by 2025-07-25, O0460 Prospecting $13374.69 by 2025-07-14, O0472 Prospecting $2676.11 by 2025-08-15
+Lead L0041 [new; low; other; 2025-05-08]: O0085 Closed Won $2750.77 by 2025-08-09
+Lead L0075 [contacted; medium; other; 2025-06-19]: O0132 Closed Won $6200.52 by 2025-08-05
+Lead L0121 [contacted; medium; other; 2025-06-25]: O0139 Closed Lost $3570.94 by 2025-08-18, O0161 Closed Won $16419.17 by 2025-08-30, O0283 Closed Lost $8786.88 by 2025-07-28"
+Scott Campos,nyoung@example.com,52195066577250,"email_campaign, other",C048,no,"Contact C048 | East Anthony, Ohio, USA
+Lead L0007 [contacted; medium; email_campaign; 2025-07-04]: O0438 Proposal Sent $7977.62 by 2025-08-26, O0490 Closed Lost $11986.06 by 2025-07-15
+Lead L0070 [qualified; high; other; 2025-06-12]: O0178 Closed Lost $18663.32 by 2025-07-28
+Lead L0109 [qualified; high; other; 2025-06-09]: O0013 Closed Lost $2773.94 by 2025-07-24, O0142 Closed Won $4384.84 by 2025-07-10, O0403 Closed Lost $15907.82 by 2025-08-11
+Lead L0135 [contacted; medium; other; 2025-01-09]: O0052 Closed Lost $9432.56 by 2025-07-20, O0327 Proposal Sent $6414.62 by 2025-08-25"
+Douglas Ortiz,jconley@example.net,2318732291,"email_campaign, website",C020,no,"Contact C020 | Jennifermouth, North Carolina, USA
+Lead L0008 [contacted; medium; email_campaign; 2025-01-09]: O0280 Prospecting $4050.02 by 2025-07-30, O0341 Proposal Sent $9850.26 by 2025-08-01
+Lead L0130 [new; high; website; 2025-02-14]: O0022 Prospecting $10118.05 by 2025-07-16, O0447 Negotiation $13936.91 by 2025-08-25, O0448 Closed Lost $13088.62 by 2025-07-21, O0451 Closed Lost $17371.9 by 2025-08-30"
+Daniel Oneill,charles33@example.net,6639962207,"other, website",C073,no,"Contact C073 | Brandonbury, Michigan, USA
+Lead L0009 [new; high; other; 2025-04-24]: O0037 Proposal Sent $5462.35 by 2025-08-26, O0117 Negotiation $16860.27 by 2025-07-15, O0160 Closed Lost $4575.42 by 2025-08-27, O0195 Closed Lost $2141.51 by 2025-08-10, O0273 Negotiation $5288.26 by 2025-08-03, O0287 Proposal Sent $10262.53 by 2025-09-04, O0370 Prospecting $1835.77 by 2025-08-29
+Lead L0125 [lost; low; website; 2025-06-14]: O0456 Closed Won $13218.11 by 2025-09-06"
+Tracy Burton,vaughngregory@example.com,5368659289,other,C092,no,"Contact C092 | East April, Michigan, USA
+Lead L0010 [new; low; other; 2025-02-27]: O0285 Closed Won $8252.68 by 2025-08-06, O0310 Closed Won $15835.08 by 2025-09-05"
+Justin Stanley,christine03@example.com,2765716118,other,C061,no,"Contact C061 | Port Gloria, Florida, USA
+Lead L0011 [lost; low; other; 2025-03-20]: O0401 Proposal Sent $1493.57 by 2025-08-01, O0429 Negotiation $19105.19 by 2025-08-22"
+Deanna Mcbride,mendozafrancis@example.net,4403259393693,other,C006,no,"Contact C006 | Hamiltonville, New York, USA
+Lead L0012 [new; low; other; 2025-05-22]: O0026 Prospecting $6617.69 by 2025-08-27, O0033 Negotiation $14859.29 by 2025-07-30, O0126 Closed Won $4047.38 by 2025-08-30"
+Shawn Adams,mark62@example.com,34694942813517,"other, referral",C055,no,"Contact C055 | Murilloville, Florida, USA
+Lead L0013 [qualified; high; referral; 2025-05-17]
+Lead L0168 [lost; low; other; 2025-05-18]: O0137 Closed Lost $14020.32 by 2025-08-14, O0450 Closed Won $18000.56 by 2025-08-15"
+Craig Garrett,todd23@example.com,293789230749645,"referral, website",C069,no,"Contact C069 | New Kayla, Pennsylvania, USA
+Lead L0014 [lost; low; website; 2025-06-03]: O0421 Negotiation $17190.08 by 2025-08-22, O0486 Closed Won $6084.0 by 2025-09-04
+Lead L0052 [qualified; high; referral; 2025-03-18]: O0064 Proposal Sent $5276.57 by 2025-08-19, O0354 Closed Lost $9649.23 by 2025-08-08
+Lead L0080 [lost; low; referral; 2025-02-15]: O0244 Negotiation $3581.38 by 2025-08-09, O0330 Prospecting $12381.94 by 2025-08-25
+Lead L0161 [new; low; referral; 2025-03-20]"
+Brandi Brown,michael40@example.org,,"email_campaign, referral, website",C067,no,"Contact C067 | North Josephton, New York, USA
+Lead L0015 [lost; low; referral; 2025-03-14]: O0071 Closed Lost $19257.04 by 2025-07-19, O0293 Closed Lost $5902.59 by 2025-07-20, O0426 Closed Lost $19961.79 by 2025-08-31
+Lead L0024 [contacted; low; email_campaign; 2025-03-28]
+Lead L0081 [new; high; website; 2025-06-29]: O0046 Closed Won $11524.2 by 2025-07-22, O0120 Prospecting $13641.01 by 2025-07-13, O0156 Proposal Sent $1804.48 by 2025-07-10, O0164 Closed Won $9967.17 by 2025-08-07, O0371 Closed Lost $18043.25 by 2025-07-11, O0498 Prospecting $4635.5 by 2025-07-22
+Lead L0176 [qualified; high; website; 2025-02-20]: O0318 Closed Won $4560.21 by 2025-07-14, O0373 Negotiation $5264.75 by 2025-08-28"
+Hector King DDS,tuckerlogan@example.com,54321271049392,"other, referral",C007,no,"Contact C007 | Erinburgh, Texas, USA
+Lead L0016 [contacted; medium; other; 2025-05-15]: O0103 Prospecting $2150.85 by 2025-07-15, O0479 Proposal Sent $1913.5 by 2025-08-13
+Lead L0123 [contacted; medium; referral; 2025-05-05]: O0082 Negotiation $8349.53 by 2025-07-22, O0267 Closed Lost $17365.53 by 2025-08-26
+Lead L0186 [new; low; other; 2025-06-05]: O0063 Closed Won $7020.89 by 2025-08-16, O0334 Negotiation $2820.72 by 2025-08-10, O0340 Proposal Sent $13463.33 by 2025-08-24"
+Haley Sutton,cruzthomas@example.com,2328339460,"email_campaign, referral",C028,no,"Contact C028 | Lake Michaelton, California, USA
+Lead L0017 [lost; low; referral; 2025-06-26]: O0044 Closed Won $1918.85 by 2025-07-12, O0062 Closed Lost $4551.84 by 2025-07-24
+Lead L0039 [lost; low; email_campaign; 2025-02-16]
+Lead L0163 [qualified; high; referral; 2025-03-07]: O0004 Prospecting $7681.23 by 2025-08-25, O0418 Closed Lost $5280.03 by 2025-08-16, O0428 Closed Won $13520.55 by 2025-08-26
+Lead L0175 [lost; low; email_campaign; 2025-04-25]: O0434 Closed Won $15210.11 by 2025-07-26
+Lead L0190 [new; low; referral; 2025-04-15]"
+Sandra Campbell,romananthony@example.org,7396004476,"other, website",C005,no,"Contact C005 | East Samanthafurt, Florida, USA
+Lead L0019 [new; high; website; 2025-04-01]: O0179 Prospecting $1797.11 by 2025-08-14, O0214 Prospecting $12652.78 by 2025-07-23, O0320 Closed Lost $15022.6 by 2025-07-09, O0477 Negotiation $18833.8 by 2025-08-12
+Lead L0098 [lost; low; other; 2025-04-05]: O0298 Prospecting $3196.52 by 2025-08-13"
+Amanda Collins,fmeza@example.net,12782637718,"email_campaign, other",C022,no,"Contact C022 | North Angelaton, North Carolina, USA
+Lead L0020 [lost; low; email_campaign; 2025-01-29]: O0198 Negotiation $17690.62 by 2025-08-26, O0410 Prospecting $2448.21 by 2025-07-21
+Lead L0099 [contacted; high; other; 2025-01-29]: O0100 Closed Lost $11255.7 by 2025-08-26, O0271 Closed Won $9570.49 by 2025-07-19, O0355 Prospecting $8341.6 by 2025-08-16, O0475 Prospecting $10125.07 by 2025-09-05"
+Jeffrey Flores,kyoung@example.net,,email_campaign,C011,no,"Contact C011 | Johnmouth, Ohio, USA
+Lead L0021 [new; high; email_campaign; 2025-03-13]: O0080 Prospecting $18828.36 by 2025-08-22, O0150 Prospecting $18830.72 by 2025-09-02, O0182 Prospecting $13290.91 by 2025-07-11, O0199 Negotiation $7695.47 by 2025-08-25"
+Timothy Daniels,robertomeyer@example.net,,"email_campaign, other",C019,no,"Contact C019 | Sheltonhaven, California, USA
+Lead L0022 [new; low; other; 2025-06-25]: O0014 Proposal Sent $16711.94 by 2025-07-15, O0248 Proposal Sent $1354.2 by 2025-08-24
+Lead L0104 [new; low; email_campaign; 2025-05-15]: O0384 Closed Won $9598.45 by 2025-07-09
+Lead L0155 [qualified; high; other; 2025-02-24]: O0008 Proposal Sent $5038.7 by 2025-07-24, O0029 Prospecting $11790.38 by 2025-07-13, O0446 Negotiation $18028.0 by 2025-07-16
+Lead L0158 [new; low; other; 2025-01-28]: O0314 Prospecting $3834.51 by 2025-09-04, O0388 Negotiation $12145.41 by 2025-07-13"
+Deborah Perez,jonathan88@example.org,3302909717,"other, website",C049,no,"Contact C049 | South Shannonberg, Texas, USA
+Lead L0023 [contacted; high; other; 2025-06-22]: O0015 Negotiation $6620.46 by 2025-08-20, O0019 Negotiation $2577.56 by 2025-08-04, O0099 Prospecting $2663.67 by 2025-08-09, O0149 Closed Won $15948.24 by 2025-07-11
+Lead L0118 [contacted; medium; other; 2025-06-14]: O0224 Closed Won $17463.83 by 2025-08-13, O0465 Proposal Sent $4467.87 by 2025-08-10, O0492 Proposal Sent $2753.84 by 2025-07-11
+Lead L0159 [qualified; high; website; 2025-02-08]: O0203 Closed Won $16674.38 by 2025-08-12, O0495 Negotiation $8560.67 by 2025-08-17"
+Dana Jones,twilson@example.org,4543169902,"email_campaign, referral",C008,no,"Contact C008 | East Christopher, North Carolina, USA
+Lead L0025 [lost; high; referral; 2025-06-02]: O0299 Prospecting $13733.67 by 2025-08-15, O0313 Closed Lost $14642.42 by 2025-08-12, O0363 Proposal Sent $18611.65 by 2025-07-14, O0367 Proposal Sent $8972.6 by 2025-08-09, O0375 Negotiation $15454.64 by 2025-08-23
+Lead L0069 [qualified; high; email_campaign; 2025-01-16]: O0157 Prospecting $17403.0 by 2025-08-22, O0482 Closed Won $2836.13 by 2025-08-13"
+Victoria Ashley,nelsonvanessa@example.com,2816269689,"other, referral",C098,no,"Contact C098 | Victoriafort, New York, USA
+Lead L0027 [qualified; high; referral; 2025-03-26]: O0133 Prospecting $2811.46 by 2025-08-09, O0240 Prospecting $5469.79 by 2025-09-01
+Lead L0047 [lost; low; referral; 2025-04-13]: O0107 Closed Lost $14583.04 by 2025-08-07
+Lead L0120 [lost; low; other; 2025-01-27]: O0095 Negotiation $15482.89 by 2025-09-05, O0391 Closed Won $13653.52 by 2025-08-12"
+Lisa Baker,mckinneyjohn@example.com,8795549551,"email_campaign, other",C089,no,"Contact C089 | Kimland, Illinois, USA
+Lead L0028 [new; low; email_campaign; 2025-01-17]
+Lead L0046 [contacted; low; other; 2025-05-25]
+Lead L0167 [lost; low; other; 2025-01-21]: O0023 Prospecting $9792.13 by 2025-08-30, O0155 Negotiation $15506.02 by 2025-07-16"
+Scott Holder,megan12@example.com,9703252891,"email_campaign, other, website",C017,no,"Contact C017 | North William, North Carolina, USA
+Lead L0029 [contacted; medium; other; 2025-01-15]: O0166 Closed Lost $3161.65 by 2025-07-28, O0193 Proposal Sent $17646.48 by 2025-09-04
+Lead L0074 [lost; low; email_campaign; 2025-06-28]: O0069 Negotiation $13983.43 by 2025-08-29, O0284 Prospecting $1712.98 by 2025-08-10, O0385 Negotiation $13838.98 by 2025-08-20
+Lead L0112 [qualified; high; website; 2025-06-26]"
+Michael Matthews,ericcombs@example.net,,"email_campaign, other",C078,no,"Contact C078 | East Veronicaborough, Georgia, USA
+Lead L0030 [new; low; email_campaign; 2025-05-17]: O0382 Prospecting $17967.65 by 2025-07-15
+Lead L0181 [new; low; other; 2025-03-01]: O0328 Closed Lost $6194.67 by 2025-08-17, O0433 Closed Lost $3600.99 by 2025-07-11, O0491 Negotiation $1108.62 by 2025-08-23"
+Joseph Berry,bjohnson@example.com,7527040451,website,C013,no,"Contact C013 | Hunterton, California, USA
+Lead L0031 [contacted; medium; website; 2025-01-14]: O0196 Negotiation $14025.58 by 2025-08-12"
+Brad Thornton,torreslaurie@example.com,9196327223,"email_campaign, referral",C038,no,"Contact C038 | Huntershire, Ohio, USA
+Lead L0032 [contacted; high; referral; 2025-05-19]: O0118 Prospecting $8794.54 by 2025-07-26, O0181 Closed Lost $12556.61 by 2025-08-19, O0277 Proposal Sent $9934.13 by 2025-07-30, O0405 Proposal Sent $7788.05 by 2025-07-31
+Lead L0048 [new; low; email_campaign; 2025-05-25]: O0129 Negotiation $17654.33 by 2025-07-28, O0136 Closed Lost $1204.45 by 2025-08-12, O0494 Negotiation $1035.43 by 2025-08-09"
+Todd Henry,jeffsanchez@example.com,8872596928,"other, referral",C053,no,"Contact C053 | Marilynmouth, Pennsylvania, USA
+Lead L0033 [contacted; high; referral; 2025-03-14]: O0001 Negotiation $1637.83 by 2025-07-21, O0059 Negotiation $1428.19 by 2025-08-01, O0068 Prospecting $8344.64 by 2025-09-05, O0121 Prospecting $14246.75 by 2025-08-12, O0123 Negotiation $7738.56 by 2025-08-17, O0353 Negotiation $13032.55 by 2025-07-21, O0436 Prospecting $15091.81 by 2025-08-27
+Lead L0061 [lost; low; other; 2025-06-17]
+Lead L0085 [contacted; high; other; 2025-04-21]: O0006 Proposal Sent $19557.45 by 2025-08-20, O0076 Negotiation $7710.02 by 2025-08-17, O0098 Closed Lost $9482.87 by 2025-07-24, O0141 Negotiation $18317.12 by 2025-08-20, O0290 Closed Lost $1962.08 by 2025-07-24"
+Morgan Baxter,scottpierce@example.org,,"other, referral",C072,no,"Contact C072 | Kevinside, Texas, USA
+Lead L0034 [lost; low; other; 2025-04-15]: O0153 Proposal Sent $12866.26 by 2025-08-02, O0197 Closed Lost $11915.83 by 2025-07-30
+Lead L0089 [contacted; high; other; 2025-04-11]: O0055 Closed Won $10962.18 by 2025-07-19, O0131 Proposal Sent $18045.96 by 2025-07-09, O0151 Negotiation $6208.81 by 2025-08-28, O0297 Closed Won $13756.05 by 2025-07-25
+Lead L0094 [contacted; medium; referral; 2025-06-14]: O0144 Negotiation $12785.87 by 2025-07-16, O0381 Proposal Sent $5201.32 by 2025-09-02, O0500 Closed Won $9296.41 by 2025-07-13
+Lead L0113 [qualified; high; other; 2025-05-23]: O0406 Negotiation $2382.03 by 2025-08-05"
+Eric Allen,ywatts@example.org,8147057262758,"email_campaign, other, referral",C030,no,"Contact C030 | East Steve, Ohio, USA
+Lead L0035 [new; high; other; 2025-04-21]: O0049 Proposal Sent $19029.11 by 2025-08-16, O0124 Proposal Sent $13824.8 by 2025-08-07, O0208 Proposal Sent $5366.79 by 2025-08-15, O0259 Negotiation $12030.76 by 2025-08-23, O0441 Closed Won $7173.69 by 2025-08-09, O0496 Prospecting $7779.35 by 2025-08-27
+Lead L0044 [contacted; high; other; 2025-01-12]: O0158 Closed Won $15354.81 by 2025-09-06, O0209 Prospecting $17424.43 by 2025-07-28, O0422 Closed Won $14370.68 by 2025-08-22, O0471 Proposal Sent $7544.18 by 2025-07-19, O0499 Prospecting $4269.38 by 2025-07-15
+Lead L0091 [new; low; referral; 2025-03-12]: O0060 Negotiation $14629.25 by 2025-08-23
+Lead L0105 [new; low; email_campaign; 2025-02-18]: O0260 Proposal Sent $14607.28 by 2025-08-18, O0453 Proposal Sent $7571.2 by 2025-09-05
+Lead L0136 [lost; high; other; 2025-05-08]: O0210 Closed Lost $8552.34 by 2025-07-21, O0383 Closed Lost $4105.5 by 2025-08-31, O0427 Proposal Sent $10291.34 by 2025-09-02, O0442 Closed Won $11496.58 by 2025-08-19"
+Brandy Smith,hdavis@example.com,9467509670,"other, referral",C047,no,"Contact C047 | South David, Texas, USA
+Lead L0036 [new; low; referral; 2025-03-22]: O0162 Closed Won $15414.3 by 2025-08-25, O0270 Closed Lost $1965.59 by 2025-09-05, O0390 Closed Won $11985.25 by 2025-08-28
+Lead L0076 [contacted; high; other; 2025-01-20]: O0278 Negotiation $11110.61 by 2025-08-08, O0364 Proposal Sent $17415.58 by 2025-08-28, O0380 Closed Won $14831.33 by 2025-08-25, O0398 Negotiation $17467.3 by 2025-08-13"
+Gloria Davis,danielsamy@example.net,,"email_campaign, other",C065,no,"Contact C065 | East Justin, Georgia, USA
+Lead L0037 [new; low; other; 2025-04-15]: O0051 Negotiation $9564.07 by 2025-08-31, O0253 Proposal Sent $14819.52 by 2025-08-31, O0466 Negotiation $12549.65 by 2025-07-18
+Lead L0131 [lost; low; email_campaign; 2025-04-08]: O0319 Negotiation $12554.18 by 2025-08-20"
+Gina Valdez,eburch@example.net,3826577537,website,C075,no,"Contact C075 | Nancyfort, North Carolina, USA
+Lead L0038 [qualified; high; website; 2025-06-17]: O0010 Prospecting $17237.15 by 2025-08-12"
+Cameron Melendez,justin13@example.org,677659299708549,"email_campaign, other, website",C044,no,"Contact C044 | Cynthiaview, California, USA
+Lead L0040 [lost; high; email_campaign; 2025-05-04]: O0032 Proposal Sent $2719.53 by 2025-07-26, O0067 Closed Won $16254.25 by 2025-08-26, O0233 Closed Lost $12487.74 by 2025-09-01, O0480 Negotiation $17557.74 by 2025-07-31
+Lead L0088 [contacted; high; other; 2025-03-30]: O0102 Proposal Sent $13819.16 by 2025-08-27, O0175 Proposal Sent $6383.01 by 2025-08-13, O0219 Prospecting $18253.11 by 2025-08-10, O0304 Closed Lost $13230.89 by 2025-07-15, O0473 Closed Won $9868.78 by 2025-07-22
+Lead L0101 [qualified; high; website; 2025-02-06]: O0040 Proposal Sent $6421.35 by 2025-07-16, O0087 Proposal Sent $14666.51 by 2025-09-02, O0294 Proposal Sent $15064.64 by 2025-07-21, O0423 Prospecting $13003.92 by 2025-07-22
+Lead L0133 [contacted; medium; email_campaign; 2025-03-24]: O0174 Closed Lost $13244.05 by 2025-08-28, O0200 Closed Won $8173.63 by 2025-07-23, O0204 Negotiation $17431.53 by 2025-08-19"
+Ashley Knapp,jimenezryan@example.net,,"email_campaign, other, referral, website",C024,no,"Contact C024 | Melissaside, Florida, USA
+Lead L0042 [qualified; high; website; 2025-02-04]: O0088 Closed Lost $6078.51 by 2025-08-11, O0241 Closed Won $11964.92 by 2025-07-17
+Lead L0078 [lost; low; email_campaign; 2025-01-08]: O0315 Proposal Sent $9211.49 by 2025-09-02, O0425 Prospecting $15304.25 by 2025-08-17, O0430 Prospecting $4111.36 by 2025-08-27
+Lead L0151 [qualified; high; other; 2025-01-09]: O0257 Closed Won $9088.25 by 2025-07-23, O0415 Closed Won $16867.14 by 2025-07-29
+Lead L0192 [qualified; high; referral; 2025-06-10]: O0192 Closed Lost $9352.76 by 2025-07-21"
+Mr. Jimmy Wong,tashamclaughlin@example.org,668753020116307,email_campaign,C093,no,"Contact C093 | East Paula, Pennsylvania, USA
+Lead L0043 [lost; low; email_campaign; 2025-04-23]: O0089 Closed Won $13395.45 by 2025-08-27, O0147 Negotiation $6536.59 by 2025-08-30, O0483 Proposal Sent $14129.16 by 2025-07-30"
+Donna Arnold,willisallen@example.net,2683615461,other,C084,no,"Contact C084 | South Maryborough, California, USA
+Lead L0045 [new; high; other; 2025-01-11]: O0018 Prospecting $16235.36 by 2025-08-26, O0039 Closed Won $17407.86 by 2025-08-01, O0143 Prospecting $13979.98 by 2025-08-04, O0177 Negotiation $17843.91 by 2025-07-16, O0188 Closed Lost $6056.55 by 2025-08-17, O0376 Negotiation $7073.21 by 2025-08-16, O0411 Prospecting $4696.33 by 2025-07-29
+Lead L0141 [new; low; other; 2025-03-12]: O0090 Proposal Sent $11773.32 by 2025-08-17"
+Roberto Odom,stevenlang@example.com,6576145059,"email_campaign, website",C057,no,"Contact C057 | South Alison, California, USA
+Lead L0049 [qualified; high; email_campaign; 2025-02-01]: O0395 Negotiation $17677.1 by 2025-09-03
+Lead L0090 [lost; low; website; 2025-04-05]: O0262 Closed Lost $7964.24 by 2025-07-24, O0356 Closed Lost $9367.45 by 2025-07-30"
+Amanda Benton,haasshawn@example.org,41929371205313,"other, website",C009,no,"Contact C009 | Randyberg, Texas, USA
+Lead L0050 [qualified; high; other; 2025-05-17]: O0016 Closed Lost $2825.88 by 2025-07-16, O0127 Negotiation $14545.58 by 2025-07-22, O0276 Proposal Sent $16780.14 by 2025-07-09
+Lead L0172 [contacted; high; website; 2025-05-25]: O0190 Closed Lost $16149.02 by 2025-09-06, O0213 Negotiation $14360.35 by 2025-08-28, O0245 Closed Lost $6178.14 by 2025-08-16, O0408 Proposal Sent $8689.57 by 2025-08-26
+Lead L0183 [qualified; high; other; 2025-03-11]: O0101 Proposal Sent $16933.68 by 2025-07-09, O0292 Closed Won $5075.29 by 2025-08-05, O0379 Closed Lost $14230.02 by 2025-08-29, O0467 Closed Won $11124.33 by 2025-07-18"
+Edward Maynard,imclaughlin@example.net,,"email_campaign, other",C088,no,"Contact C088 | Michellestad, Ohio, USA
+Lead L0051 [lost; high; other; 2025-02-15]: O0038 Closed Lost $11449.68 by 2025-07-26, O0186 Proposal Sent $19757.67 by 2025-08-20, O0256 Negotiation $14064.77 by 2025-07-29, O0329 Closed Lost $5027.03 by 2025-07-10
+Lead L0143 [lost; low; email_campaign; 2025-05-15]: O0274 Closed Lost $16184.18 by 2025-07-27, O0389 Proposal Sent $6428.97 by 2025-07-10"
+Rhonda Richards,krista22@example.org,736357530944643,"other, website",C056,no,"Contact C056 | Princetown, Texas, USA
+Lead L0053 [lost; low; other; 2025-02-27]: O0247 Negotiation $9509.17 by 2025-08-29
+Lead L0149 [qualified; high; website; 2025-03-04]: O0163 Proposal Sent $11200.63 by 2025-07-22, O0335 Closed Lost $11985.51 by 2025-08-31, O0374 Prospecting $10769.93 by 2025-08-04, O0402 Negotiation $19018.85 by 2025-08-28"
+Vincent Lee,wbrewer@example.com,8759725793,"email_campaign, other",C085,no,"Contact C085 | Johnsonfurt, Florida, USA
+Lead L0054 [contacted; high; other; 2025-04-23]: O0027 Closed Won $19374.54 by 2025-08-15, O0220 Closed Lost $14893.52 by 2025-08-13, O0250 Negotiation $9453.22 by 2025-08-13, O0339 Negotiation $12882.43 by 2025-07-11, O0449 Closed Lost $14150.66 by 2025-08-04
+Lead L0060 [contacted; medium; email_campaign; 2025-04-02]: O0084 Proposal Sent $18408.18 by 2025-08-20, O0368 Proposal Sent $16376.94 by 2025-08-11"
+Patricia Kent,vhanson@example.org,98570915911421,email_campaign,C037,no,"Contact C037 | Kathleenmouth, Texas, USA
+Lead L0055 [lost; high; email_campaign; 2025-02-13]: O0128 Prospecting $14804.83 by 2025-08-18, O0134 Closed Lost $1329.16 by 2025-08-10, O0171 Closed Won $2760.33 by 2025-07-24, O0263 Prospecting $2109.49 by 2025-08-22
+Lead L0182 [contacted; medium; email_campaign; 2025-06-24]: O0416 Negotiation $13014.06 by 2025-08-29"
+Robert Nguyen,tonya98@example.org,5502879571904,"email_campaign, referral, website",C025,no,"Contact C025 | South Kurtfurt, Georgia, USA
+Lead L0056 [qualified; high; email_campaign; 2025-03-08]: O0002 Closed Lost $7160.01 by 2025-07-14, O0025 Negotiation $16958.29 by 2025-08-30, O0105 Prospecting $14408.01 by 2025-08-23, O0289 Closed Won $1566.37 by 2025-09-03, O0413 Prospecting $7879.4 by 2025-07-29, O0454 Negotiation $11467.25 by 2025-09-03
+Lead L0059 [qualified; high; referral; 2025-05-27]: O0009 Negotiation $14280.16 by 2025-09-05, O0056 Closed Won $3258.6 by 2025-07-28, O0301 Closed Lost $9660.6 by 2025-08-25, O0306 Closed Won $1943.51 by 2025-07-23, O0326 Negotiation $6946.79 by 2025-09-01, O0338 Proposal Sent $12050.95 by 2025-08-28, O0445 Closed Lost $5273.12 by 2025-08-04
+Lead L0071 [lost; low; website; 2025-04-16]: O0048 Closed Won $19165.52 by 2025-08-01, O0109 Closed Lost $11874.57 by 2025-08-01
+Lead L0150 [qualified; high; website; 2025-05-21]: O0272 Closed Lost $8074.45 by 2025-07-25, O0397 Proposal Sent $16310.03 by 2025-08-12, O0462 Closed Lost $3401.45 by 2025-08-24
+Lead L0188 [new; high; email_campaign; 2025-05-24]: O0017 Prospecting $4708.72 by 2025-07-13, O0092 Prospecting $13937.72 by 2025-07-25, O0222 Negotiation $7303.16 by 2025-07-21, O0258 Negotiation $12289.23 by 2025-08-28, O0357 Prospecting $18264.14 by 2025-09-04"
+Joshua Carroll,bduffy@example.org,294914697736321,"email_campaign, other, referral, website",C026,no,"Contact C026 | East Danielle, Michigan, USA
+Lead L0057 [new; low; other; 2025-07-05]: O0152 Closed Lost $19572.04 by 2025-08-16, O0221 Closed Won $17571.65 by 2025-08-11
+Lead L0067 [new; high; website; 2025-01-11]: O0042 Proposal Sent $12275.73 by 2025-08-10, O0342 Proposal Sent $11700.86 by 2025-09-01, O0362 Negotiation $16088.77 by 2025-07-09, O0396 Negotiation $12928.82 by 2025-07-30
+Lead L0127 [contacted; low; referral; 2025-05-01]
+Lead L0153 [new; high; other; 2025-01-20]: O0108 Negotiation $14230.05 by 2025-08-21, O0114 Closed Lost $17316.95 by 2025-08-18, O0351 Closed Won $10895.81 by 2025-09-03, O0404 Negotiation $10322.39 by 2025-07-20
+Lead L0156 [new; low; email_campaign; 2025-06-19]: O0325 Negotiation $4190.39 by 2025-07-13, O0348 Negotiation $3588.41 by 2025-07-16"
+Jeffrey Curry,carolwalters@example.org,3805217300,"other, referral",C086,no,"Contact C086 | Jamesburgh, California, USA
+Lead L0058 [qualified; high; other; 2025-05-19]: O0268 Closed Won $11015.37 by 2025-07-19, O0350 Prospecting $3132.24 by 2025-07-12
+Lead L0079 [new; low; referral; 2025-02-01]: O0235 Closed Won $1971.49 by 2025-09-06, O0361 Prospecting $18073.03 by 2025-08-26"
+Brooke Brown,brian87@example.com,13955571028208,"other, website",C001,no,"Contact C001 | North Jeffery, Texas, USA
+Lead L0062 [contacted; medium; website; 2025-07-07]: O0333 Proposal Sent $9462.15 by 2025-08-06, O0481 Proposal Sent $11484.82 by 2025-07-20
+Lead L0063 [qualified; high; other; 2025-01-09]: O0239 Proposal Sent $4889.54 by 2025-08-14, O0312 Closed Won $13638.9 by 2025-09-06, O0443 Closed Won $5227.22 by 2025-08-28
+Lead L0126 [new; low; other; 2025-01-23]"
+Terry Murray,matthewedwards@example.com,6554026822,referral,C087,no,"Contact C087 | East Kristinmouth, Pennsylvania, USA
+Lead L0064 [lost; low; referral; 2025-05-26]: O0165 Prospecting $12657.68 by 2025-08-12, O0344 Negotiation $17332.09 by 2025-07-27, O0474 Prospecting $4542.86 by 2025-08-21"
+Miranda Crawford,xavierhood@example.org,8642373954,"other, website",C027,no,"Contact C027 | Stevenburgh, Illinois, USA
+Lead L0065 [lost; low; other; 2025-03-06]: O0261 Negotiation $15770.39 by 2025-08-22
+Lead L0137 [lost; low; website; 2025-05-09]: O0249 Prospecting $6331.66 by 2025-07-15, O0269 Negotiation $13283.57 by 2025-08-10, O0386 Closed Lost $19366.02 by 2025-08-11"
+Christine Fowler,rporter@example.com,7157246431,other,C060,no,"Contact C060 | Yvonneborough, Texas, USA
+Lead L0066 [qualified; high; other; 2025-02-02]: O0295 Prospecting $3596.62 by 2025-08-10, O0311 Closed Lost $19676.98 by 2025-08-25"
+Kayla Price,christina11@example.org,4223677232,"referral, website",C040,no,"Contact C040 | Munozchester, Pennsylvania, USA
+Lead L0068 [new; low; website; 2025-01-20]: O0053 Closed Won $12402.49 by 2025-08-27
+Lead L0103 [new; low; referral; 2025-02-21]: O0366 Prospecting $4263.21 by 2025-07-09, O0392 Proposal Sent $1379.73 by 2025-08-11
+Lead L0194 [lost; low; referral; 2025-03-21]"
+John Walker,kristiconner@example.com,17367535053,"email_campaign, other",C059,no,"Contact C059 | North Williamton, Illinois, USA
+Lead L0073 [contacted; medium; other; 2025-02-18]: O0005 Proposal Sent $17991.03 by 2025-08-25, O0074 Negotiation $2933.18 by 2025-09-01, O0212 Negotiation $10599.97 by 2025-08-22
+Lead L0184 [qualified; high; email_campaign; 2025-02-09]: O0028 Closed Won $10616.58 by 2025-08-15"
+Katherine Hull,jackie03@example.com,9083636259,"email_campaign, other",C036,no,"Contact C036 | Christopherland, Texas, USA
+Lead L0077 [lost; low; email_campaign; 2025-04-22]: O0021 Closed Lost $3196.72 by 2025-07-10, O0086 Closed Lost $12294.85 by 2025-08-18, O0251 Prospecting $8301.57 by 2025-08-06
+Lead L0093 [new; low; other; 2025-01-08]: O0035 Closed Lost $13644.18 by 2025-08-30, O0170 Proposal Sent $2896.9 by 2025-08-07, O0216 Prospecting $18428.58 by 2025-07-20"
+Anthony Garcia,christiancunningham@example.org,2305161683,"email_campaign, other, website",C043,no,"Contact C043 | West Diane, Illinois, USA
+Lead L0082 [new; low; email_campaign; 2025-06-24]: O0169 Closed Lost $3046.04 by 2025-08-14, O0452 Proposal Sent $11359.38 by 2025-08-18
+Lead L0083 [qualified; high; website; 2025-05-16]: O0020 Prospecting $13721.66 by 2025-08-22, O0187 Closed Lost $14585.41 by 2025-08-25, O0478 Prospecting $5068.14 by 2025-09-02
+Lead L0117 [new; high; other; 2025-06-06]: O0113 Closed Won $13042.98 by 2025-08-12, O0238 Closed Won $14142.72 by 2025-07-20, O0420 Closed Won $19066.13 by 2025-07-26, O0470 Closed Lost $8802.58 by 2025-08-24"
+Matthew Adams,harriscarrie@example.com,9003179204,"referral, website",C082,no,"Contact C082 | Port Jasonborough, Florida, USA
+Lead L0084 [qualified; high; website; 2025-04-19]: O0336 Closed Won $5385.06 by 2025-07-15, O0424 Closed Won $16883.78 by 2025-08-01
+Lead L0187 [lost; low; referral; 2025-02-11]: O0030 Negotiation $7560.62 by 2025-08-01, O0066 Closed Lost $8017.57 by 2025-08-24, O0488 Closed Won $5497.28 by 2025-08-18"
+Brooke Bailey,mccoyrachael@example.com,729536695815099,"email_campaign, other, referral",C018,no,"Contact C018 | Melanietown, Michigan, USA
+Lead L0086 [new; low; other; 2025-05-25]: O0417 Closed Lost $8094.84 by 2025-07-14
+Lead L0097 [new; low; referral; 2025-05-28]
+Lead L0139 [contacted; medium; email_campaign; 2025-01-20]: O0024 Closed Won $19664.9 by 2025-08-16, O0122 Closed Won $12486.11 by 2025-08-05"
+Yolanda Peterson,victoria60@example.org,,website,C051,no,"Contact C051 | Lesterfort, Illinois, USA
+Lead L0087 [new; high; website; 2025-05-05]: O0011 Negotiation $2023.1 by 2025-08-27, O0106 Closed Lost $12410.12 by 2025-07-11, O0332 Closed Lost $14631.16 by 2025-08-14, O0346 Closed Lost $8353.22 by 2025-09-02"
+Robert Jordan,colonlisa@example.net,2156545302,referral,C063,no,"Contact C063 | Crystalmouth, Ohio, USA
+Lead L0092 [qualified; high; referral; 2025-01-31]"
+Kristin Edwards,donnagarza@example.org,846964588382964,other,C090,no,"Contact C090 | North Jonview, Texas, USA
+Lead L0095 [new; low; other; 2025-06-01]"
+Emily Perez,troy40@example.net,0013139208953,"other, website",C096,no,"Contact C096 | East Taramouth, Ohio, USA
+Lead L0096 [contacted; medium; website; 2025-01-26]: O0041 Closed Won $19799.66 by 2025-07-30, O0183 Closed Won $18884.85 by 2025-07-27, O0358 Negotiation $1119.03 by 2025-07-10
+Lead L0199 [new; low; other; 2025-06-16]: O0236 Prospecting $8271.89 by 2025-08-14"
+Shawn Anderson,darlenesanchez@example.net,6298860011138,"other, referral",C079,no,"Contact C079 | Robinsonchester, Ohio, USA
+Lead L0100 [contacted; medium; other; 2025-06-19]: O0231 Closed Lost $3922.59 by 2025-07-30, O0440 Proposal Sent $4380.34 by 2025-07-15
+Lead L0138 [contacted; high; referral; 2025-03-28]: O0077 Closed Won $19463.53 by 2025-08-31, O0115 Closed Lost $4827.8 by 2025-08-19, O0140 Closed Won $18103.5 by 2025-09-05, O0232 Prospecting $4784.58 by 2025-07-13, O0343 Proposal Sent $4423.85 by 2025-08-31, O0399 Closed Won $17414.0 by 2025-09-05, O0439 Closed Won $3969.32 by 2025-07-13, O0476 Proposal Sent $19203.36 by 2025-07-09"
+Perry Ramirez,brooksangela@example.org,9425112449,"email_campaign, other, website",C081,no,"Contact C081 | North Christinamouth, North Carolina, USA
+Lead L0102 [contacted; medium; email_campaign; 2025-05-27]: O0464 Prospecting $16573.57 by 2025-08-20
+Lead L0128 [new; low; other; 2025-04-29]: O0057 Proposal Sent $2327.63 by 2025-08-07, O0065 Prospecting $6602.55 by 2025-08-19, O0288 Prospecting $9484.46 by 2025-09-01
+Lead L0148 [new; low; website; 2025-03-26]: O0307 Closed Won $13093.63 by 2025-08-03, O0337 Closed Lost $17166.95 by 2025-08-30"
+Robin Lopez,alexander27@example.net,,"other, referral",C031,no,"Contact C031 | Manntown, Pennsylvania, USA
+Lead L0106 [lost; low; other; 2025-05-20]
+Lead L0142 [contacted; medium; referral; 2025-04-08]: O0378 Proposal Sent $2136.86 by 2025-09-01
+Lead L0145 [qualified; high; other; 2025-02-24]: O0242 Prospecting $2360.65 by 2025-08-22, O0243 Closed Lost $15562.76 by 2025-07-27, O0469 Closed Won $12453.85 by 2025-08-14"
+Jenny Powell,jamescarroll@example.net,19142458005,"other, website",C094,no,"Contact C094 | Brittneybury, Florida, USA
+Lead L0107 [new; low; other; 2025-05-11]: O0437 Proposal Sent $8304.12 by 2025-08-02
+Lead L0198 [new; high; website; 2025-02-06]: O0070 Negotiation $9867.9 by 2025-09-01, O0083 Closed Won $8728.51 by 2025-07-15, O0097 Prospecting $9600.67 by 2025-07-17, O0135 Prospecting $2233.0 by 2025-08-05, O0228 Closed Lost $2675.68 by 2025-08-01, O0323 Closed Lost $11676.82 by 2025-08-22"
+Joseph Roman,sgonzalez@example.com,,"other, referral",C021,no,"Contact C021 | Jonathanstad, Florida, USA
+Lead L0108 [lost; low; referral; 2025-01-26]: O0493 Closed Won $16054.47 by 2025-08-20
+Lead L0116 [qualified; high; other; 2025-04-19]: O0394 Closed Lost $4255.65 by 2025-08-31, O0407 Prospecting $12607.03 by 2025-08-06
+Lead L0154 [lost; low; other; 2025-07-01]: O0189 Proposal Sent $11516.1 by 2025-08-31, O0324 Negotiation $7539.41 by 2025-09-01"
+Gabrielle Munoz,vfuller@example.org,28781757652340,website,C076,no,"Contact C076 | Port Jennifer, Florida, USA
+Lead L0110 [lost; low; website; 2025-06-01]: O0185 Negotiation $5507.69 by 2025-07-29, O0455 Proposal Sent $8415.14 by 2025-09-05"
+Steven Meyers,obrienwillie@example.org,885604302533639,"other, website",C003,no,"Contact C003 | South Shawnberg, Illinois, USA
+Lead L0111 [contacted; medium; other; 2025-06-28]: O0303 Negotiation $5971.46 by 2025-07-22
+Lead L0162 [contacted; medium; website; 2025-04-01]: O0104 Proposal Sent $14031.69 by 2025-08-01, O0217 Closed Lost $15608.02 by 2025-08-14, O0497 Closed Lost $7647.23 by 2025-09-04
+Lead L0189 [qualified; high; website; 2025-03-08]: O0347 Proposal Sent $2304.35 by 2025-08-17"
+Brooke Stevens,jsimmons@example.net,6877517310,email_campaign,C016,no,"Contact C016 | Williamsside, Florida, USA
+Lead L0114 [lost; high; email_campaign; 2025-07-04]: O0112 Proposal Sent $2427.75 by 2025-08-23, O0184 Prospecting $1336.57 by 2025-07-10, O0264 Negotiation $12181.23 by 2025-07-23, O0266 Closed Lost $16434.87 by 2025-07-12, O0352 Closed Won $8789.77 by 2025-08-09"
+Scott Acosta,brianchavez@example.net,2586779597,"email_campaign, referral, website",C010,no,"Contact C010 | Port Randy, Michigan, USA
+Lead L0115 [qualified; high; website; 2025-05-03]: O0003 Negotiation $8669.81 by 2025-08-25, O0173 Prospecting $7556.32 by 2025-08-19, O0419 Proposal Sent $4661.22 by 2025-08-04
+Lead L0132 [contacted; high; referral; 2025-05-29]: O0079 Closed Lost $10172.3 by 2025-07-24, O0191 Closed Lost $10700.46 by 2025-07-25, O0207 Proposal Sent $14978.09 by 2025-08-21, O0255 Closed Lost $10546.81 by 2025-07-22
+Lead L0177 [new; low; email_campaign; 2025-02-03]: O0096 Prospecting $16781.72 by 2025-07-19, O0111 Negotiation $15403.43 by 2025-09-03, O0459 Negotiation $6313.2 by 2025-08-11"
+Katelyn Ashley,hamiltonmichele@example.net,19652376239,referral,C071,no,"Contact C071 | Brownchester, Illinois, USA
+Lead L0119 [new; low; referral; 2025-05-29]: O0282 Proposal Sent $14785.07 by 2025-07-14, O0316 Closed Won $8049.42 by 2025-07-10"
+Lydia Campbell,barbercarolyn@example.com,284917892587739,"email_campaign, other",C023,no,"Contact C023 | Brandimouth, Ohio, USA
+Lead L0122 [lost; low; other; 2025-03-09]: O0130 Prospecting $16236.35 by 2025-08-20, O0223 Closed Lost $2403.19 by 2025-09-02, O0393 Closed Won $10200.48 by 2025-08-30
+Lead L0140 [contacted; medium; other; 2025-01-19]: O0309 Closed Lost $6161.43 by 2025-08-21
+Lead L0193 [new; low; email_campaign; 2025-06-27]: O0206 Closed Won $12332.21 by 2025-08-29, O0215 Closed Won $3393.94 by 2025-07-10"
+Clinton Morris,silvamichael@example.net,19423448762,"other, website",C083,no,"Contact C083 | North Matthew, Pennsylvania, USA
+Lead L0124 [contacted; medium; other; 2025-02-21]: O0110 Proposal Sent $10054.15 by 2025-08-25, O0234 Closed Lost $13678.52 by 2025-08-12
+Lead L0165 [lost; high; website; 2025-06-28]: O0061 Proposal Sent $19517.42 by 2025-08-21, O0322 Closed Lost $2412.61 by 2025-07-24, O0387 Closed Won $4140.58 by 2025-07-28, O0457 Negotiation $12757.39 by 2025-07-31, O0463 Closed Won $19559.36 by 2025-08-12"
+Jane Bell,nancy06@example.org,181286320790469,other,C062,no,"Contact C062 | Peggyfort, Texas, USA
+Lead L0134 [new; low; other; 2025-05-20]: O0226 Proposal Sent $18939.34 by 2025-08-14, O0281 Prospecting $5948.86 by 2025-08-14, O0360 Closed Lost $19018.16 by 2025-08-13"
+Gregory Williams,moralesdavid@example.org,,other,C068,no,"Contact C068 | Mikeview, Pennsylvania, USA
+Lead L0144 [new; high; other; 2025-06-21]: O0154 Closed Lost $12236.3 by 2025-07-15, O0167 Prospecting $4262.65 by 2025-07-29, O0205 Closed Won $6295.8 by 2025-08-17, O0230 Closed Won $12735.95 by 2025-08-23, O0369 Prospecting $12116.56 by 2025-08-21"
+Lisa Vazquez,abigail44@example.net,3462887014213,other,C099,no,"Contact C099 | Port Cody, Illinois, USA
+Lead L0146 [qualified; high; other; 2025-05-09]: O0072 Closed Lost $11109.32 by 2025-08-21, O0093 Closed Lost $11377.11 by 2025-07-30, O0218 Proposal Sent $19363.66 by 2025-08-23
+Lead L0169 [qualified; high; other; 2025-06-30]: O0159 Closed Won $17737.82 by 2025-07-26, O0377 Negotiation $2140.17 by 2025-07-12"
+Mr. Juan Joseph,meltondustin@example.org,409956618648864,"email_campaign, referral",C064,no,"Contact C064 | Lake Mary, Illinois, USA
+Lead L0147 [new; low; referral; 2025-04-11]: O0286 Closed Won $9650.21 by 2025-08-27, O0412 Proposal Sent $18542.95 by 2025-08-12, O0484 Negotiation $9524.81 by 2025-08-26
+Lead L0179 [lost; low; email_campaign; 2025-04-25]: O0075 Closed Lost $16317.44 by 2025-08-17, O0485 Closed Won $10727.3 by 2025-07-23"
+Daniel Hoffman,ryan23@example.net,9579621534,"email_campaign, other",C002,no,"Contact C002 | Hamiltonchester, California, USA
+Lead L0152 [qualified; high; other; 2025-03-31]: O0047 Closed Lost $17337.15 by 2025-08-11, O0372 Negotiation $11204.84 by 2025-08-16
+Lead L0191 [qualified; high; email_campaign; 2025-02-03]: O0054 Closed Won $13318.02 by 2025-08-09, O0146 Negotiation $13067.68 by 2025-08-31, O0194 Negotiation $9684.43 by 2025-07-13, O0317 Closed Won $14678.94 by 2025-09-01"
+Tammy Moran,meghan25@example.org,3399431203,other,C004,no,"Contact C004 | Port Bradleyland, Florida, USA
+Lead L0157 [contacted; low; other; 2025-02-05]"
+Brandon Smith,uwhite@example.org,5716899635336,email_campaign,C041,no,"Contact C041 | Alvaradoton, Pennsylvania, USA
+Lead L0160 [contacted; medium; email_campaign; 2025-05-04]: O0225 Negotiation $12374.68 by 2025-08-05, O0229 Negotiation $15922.85 by 2025-07-17, O0279 Negotiation $10927.75 by 2025-07-23"
+Bradley Berger,aaronmedina@example.net,2657025924,email_campaign,C015,no,"Contact C015 | Gregoryville, Florida, USA
+Lead L0166 [new; low; email_campaign; 2025-03-06]: O0138 Prospecting $2784.37 by 2025-09-01"
+Brenda Mendez,cassidycline@example.org,2227374152,other,C042,no,"Contact C042 | Simmonsport, Michigan, USA
+Lead L0170 [new; low; other; 2025-02-13]: O0349 Prospecting $10955.97 by 2025-09-02, O0359 Closed Won $5335.85 by 2025-08-13, O0414 Closed Lost $5640.62 by 2025-08-10"
+Caitlin Lara,williamsdennis@example.com,3577632086773,other,C035,no,"Contact C035 | Rogersburgh, Pennsylvania, USA
+Lead L0171 [contacted; medium; other; 2025-04-13]: O0148 Prospecting $5474.5 by 2025-09-04, O0345 Prospecting $10767.03 by 2025-09-03
+Lead L0173 [new; high; other; 2025-03-15]: O0034 Proposal Sent $15322.52 by 2025-08-07, O0145 Prospecting $5920.72 by 2025-07-14, O0265 Proposal Sent $1599.21 by 2025-07-09, O0461 Proposal Sent $17186.52 by 2025-08-08
+Lead L0174 [contacted; medium; other; 2025-04-09]: O0078 Negotiation $6561.98 by 2025-09-03, O0201 Proposal Sent $7866.5 by 2025-08-10, O0202 Closed Lost $7015.66 by 2025-08-30
+Lead L0196 [qualified; high; other; 2025-06-06]: O0308 Closed Lost $15910.23 by 2025-07-26, O0431 Closed Lost $15332.34 by 2025-08-24"
+Craig Eaton,teresa05@example.org,909741183553538,website,C095,no,"Contact C095 | South Michaelton, Georgia, USA
+Lead L0178 [qualified; high; website; 2025-03-05]: O0036 Prospecting $13380.04 by 2025-07-25, O0321 Closed Won $6115.08 by 2025-07-24"
+Richard Stuart,gordonthompson@example.org,624801581850003,other,C097,no,"Contact C097 | Deannafurt, Georgia, USA
+Lead L0180 [contacted; medium; other; 2025-06-03]: O0050 Closed Lost $8212.3 by 2025-08-31"
+Katherine Watkins,jessica58@example.com,8316295340019,website,C050,no,"Contact C050 | Williamsmouth, North Carolina, USA
+Lead L0195 [new; low; website; 2025-02-23]: O0073 Closed Won $9262.41 by 2025-07-15, O0211 Closed Won $9229.66 by 2025-07-31"

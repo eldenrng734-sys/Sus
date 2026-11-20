@@ -33,6 +33,7 @@ import type { RoleType, TenantMember, Team } from "@/lib/api/settings";
 import { parseApiError } from "@/lib/api-error";
 import { ErrorBanner } from "@/components/shared/error-banner";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import { DEFAULT_TIMEZONE } from "@/lib/format";
 
 type SettingsTab = "users" | "teams" | "automation";
 
@@ -99,13 +100,13 @@ export default function SettingsPage() {
 
   const updateAutomationMutation = useUpdateAutomationSettings();
 
-  const [tz, setTz] = useState("Asia/Dhaka");
+  const [tz, setTz] = useState(DEFAULT_TIMEZONE);
   const [quietStart, setQuietStart] = useState("22:00");
   const [quietEnd, setQuietEnd] = useState("08:00");
 
   useEffect(() => {
     if (automationSettings) {
-      setTz(automationSettings.timezone || "Asia/Dhaka");
+      setTz(automationSettings.timezone || DEFAULT_TIMEZONE);
       setQuietStart(automationSettings.quiet_hours_start || "22:00");
       setQuietEnd(automationSettings.quiet_hours_end || "08:00");
     }

@@ -18,6 +18,7 @@ import type { CsvImportResult } from "@/lib/api/leads";
 import { parseApiError } from "@/lib/api-error";
 import { ErrorBanner } from "@/components/shared/error-banner";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import { DEFAULT_TIMEZONE } from "@/lib/format";
 
 type Lead = {
   id: string;
@@ -65,8 +66,10 @@ function formatOption(value: string) {
 }
 
 export default function LeadsPage() {
-  const { role } = useAuth();
+  const { role, user, timezone } = useAuth();
   const isManagerOrAdmin = role === "manager" || role === "admin";
+  // User initial for the header avatar — falls back to "?" when session loads
+  const userInitial = (user?.display_name || user?.email || "?").charAt(0).toUpperCase();
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState("");
@@ -201,11 +204,16 @@ export default function LeadsPage() {
               Lead Management
             </h1>
           </div>
-          <div
-            aria-hidden="true"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700"
-          >
-            U
+          <div className="flex items-center gap-3">
+            <span className="hidden rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 sm:inline-flex">
+              Timezone: {timezone || DEFAULT_TIMEZONE}
+            </span>
+            <div
+              title={user?.display_name || user?.email || "User"}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700"
+            >
+              {userInitial}
+            </div>
           </div>
         </header>
 
@@ -242,14 +250,20 @@ export default function LeadsPage() {
 
           <section className="grid gap-4 sm:grid-cols-3">
             {[
-              { label: "Leads on this page", value: leads.length },
               {
-                label: "New on this page",
-                value: leads.filter((lead) => lead.status === "new").length,
+                label: "Total on page",
+                value: leads.length,
+                note: "Up to 25 per page",
               },
               {
-                label: "High priority on this page",
+                label: "New (this page)",
+                value: leads.filter((lead) => lead.status === "new").length,
+                note: "Status = New",
+              },
+              {
+                label: "High priority (this page)",
                 value: leads.filter((lead) => lead.priority === "high").length,
+                note: "Use filters for full counts",
               },
             ].map((metric) => (
               <article
@@ -260,6 +274,9 @@ export default function LeadsPage() {
                 <p className="mt-3 text-2xl font-bold text-slate-900">
                   {loading ? "--" : metric.value}
                 </p>
+                {"note" in metric && (
+                  <p className="mt-1 text-xs text-slate-400">{metric.note}</p>
+                )}
               </article>
             ))}
           </section>
@@ -345,9 +362,10 @@ export default function LeadsPage() {
               </select>
 
               <input
-                aria-label="Filter by assigned user ID"
+                aria-label="Filter by assigned user ID (UUID)"
                 type="text"
-                placeholder="Assigned user ID"
+                placeholder="Owner UUID (optional)"
+                title="Paste a team member's user ID to filter by assignee"
                 value={owner}
                 onChange={(event) => {
                   setOwner(event.target.value);
@@ -405,8 +423,16 @@ export default function LeadsPage() {
                             {formatOption(lead.priority)}
                           </span>
                         </td>
-                        <td className="px-5 py-4 text-slate-600">
-                          {lead.assigned_user_id ? "Assigned" : "Unassigned"}
+                        <td className="px-5 py-4 text-slate-500">
+                          {lead.assigned_user_id ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">
+                              Assigned
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">
+                              Unassigned
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
