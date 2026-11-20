@@ -27,6 +27,8 @@ services:
 
   backend:
     build: ../backend
+    env_file:
+      - ../.env
     environment:
       APP_ENV: ${APP_ENV}
       DATABASE_URL: ${DATABASE_URL}
@@ -41,6 +43,13 @@ services:
       SMTP_PORT: "1025"
       MAIL_FROM: no-reply@crm.local
       FRONTEND_BASE_URL: http://localhost:3000
+      META_APP_ID: ${META_APP_ID:-}
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      META_GRAPH_VERSION: ${META_GRAPH_VERSION:-v21.0}
+      META_VERIFY_TOKEN: ${META_VERIFY_TOKEN:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WEBHOOK_VERIFY_TOKEN: ${WEBHOOK_VERIFY_TOKEN:-}
+      INTEGRATION_ENCRYPTION_KEY: ${INTEGRATION_ENCRYPTION_KEY:-}
     ports:
       - "8000:8000"
     volumes:
@@ -55,6 +64,8 @@ services:
   worker:
     build: ../backend
     command: python -m app.worker
+    env_file:
+      - ../.env
     environment:
       APP_ENV: ${APP_ENV}
       DATABASE_URL: ${DATABASE_URL}
@@ -78,6 +89,8 @@ services:
   dispatcher:
     build: ../backend
     command: python -m app.dispatcher
+    env_file:
+      - ../.env
     environment:
       APP_ENV: ${APP_ENV}
       DATABASE_URL: ${DATABASE_URL}
