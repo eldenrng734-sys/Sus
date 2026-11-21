@@ -87,7 +87,6 @@ select {
 }
 
 a {
-  color: inherit;
   text-decoration: none;
 }
 
@@ -276,16 +275,50 @@ a {
   --sidebar-ring: #64748b;
 }
 
-/* Subtle transitions */
-body,
-button,
-a,
+/*
+ * Subtle transitions for theme changes.
+ * `body` only transitions background-color and color — never transform or opacity,
+ * which would cause whole-page painting stutter and jank on route navigation.
+ */
+body {
+  transition-property: background-color, color;
+  transition-duration: 180ms;
+  transition-timing-function: ease;
+}
+
 input,
 textarea,
 select {
   transition-property: background-color, border-color, color, box-shadow;
   transition-duration: 180ms;
   transition-timing-function: ease;
+}
+
+/* ==========================================
+   PAGE CHANGE TRANSITIONS
+   ==========================================
+   Smooth, GPU-accelerated enter animation for page transitions.
+   Animates compositor-only properties (opacity crossfade + subtle scale from 0.97
+   and micro vertical translation) anchored to top-center.
+   Duration: 250ms with a crisp spring-like deceleration curve (0.16, 1, 0.3, 1).
+   Ensures the navigation shell (<aside>) remains stationary while the page
+   content eases cleanly into view without awkward DOM stacking.
+   ========================================== */
+@keyframes pageEnter {
+  0% {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.page-transition main {
+  animation: pageEnter 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: 50% 0;
+  will-change: opacity, transform;
 }
 
 /* Respect reduced-motion preferences */
@@ -296,6 +329,138 @@ select {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .page-transition main {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+/* SYNTRIX GLOBAL DARK MODE COLOR FIX */
+
+/* Page backgrounds and surfaces */
+.dark .bg-white,
+.dark .bg-gray-50,
+.dark .bg-slate-50 {
+  background-color: #0f172a !important;
+}
+
+.dark article.bg-white,
+.dark section.bg-white,
+.dark div.bg-white,
+.dark .bg-white.p-5,
+.dark .bg-white.p-6,
+.dark .bg-white.p-8 {
+  background-color: #1e293b !important;
+}
+
+.dark .bg-slate-100,
+.dark .bg-gray-100 {
+  background-color: #334155 !important;
+}
+
+.dark .bg-slate-200,
+.dark .bg-gray-200 {
+  background-color: #475569 !important;
+}
+
+/* Text colors */
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-gray-900,
+.dark .text-gray-800 {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-700,
+.dark .text-gray-700 {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-slate-600,
+.dark .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-500,
+.dark .text-slate-400,
+.dark .text-gray-500,
+.dark .text-gray-400 {
+  color: #94a3b8 !important;
+}
+
+/* Borders */
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-gray-100,
+.dark .border-gray-200 {
+  border-color: #334155 !important;
+}
+
+.dark .border-slate-300,
+.dark .border-gray-300 {
+  border-color: #475569 !important;
+}
+
+/* Hover states */
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-gray-50:hover {
+  background-color: #334155 !important;
+}
+
+.dark .hover\:bg-slate-100:hover,
+.dark .hover\:bg-gray-100:hover {
+  background-color: #475569 !important;
+}
+
+/* Form controls */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark select {
+  color: #f8fafc;
+  background-color: #1e293b;
+  border-color: #475569;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* SYNTRIX PROFESSIONAL INTERACTION POLISH */
+/*
+ * Placed in @layer base so that utility classes on custom components (like <Button />'s
+ * focus-visible:outline-none and custom focus rings) can naturally override these
+ * fallbacks without cascade fighting.
+ */
+@layer base {
+  button,
+  a,
+  [role="button"] {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: 160ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  a,
+  [role="button"] {
     transition-duration: 0.01ms !important;
   }
 }

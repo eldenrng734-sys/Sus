@@ -36,7 +36,7 @@ Open Chrome/Edge and go to:
 
 **Login Credentials:**
 - **Email:** `admin@acme.test`
-- **Password:** `TKlagbetk`
+- **Password:** `ChangeMe!12345`
 
 You are ready to code! 🎉
 

@@ -11,7 +11,6 @@ import {
   Clock,
   ListTodo,
   X,
-  RefreshCw,
   ClipboardCheck,
   AlertTriangle,
   Play,
@@ -36,6 +35,7 @@ import { parseApiError } from "@/lib/api-error";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorBanner } from "@/components/shared/error-banner";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import { RefreshButton } from "@/components/shared/refresh-button";
 
 type TaskTab = "today" | "overdue" | "upcoming" | "approval_queue" | "completed" | "all";
 
@@ -384,14 +384,11 @@ export default function TasksPage() {
             </div>
 
             <div className="flex gap-2">
-              <button
-                onClick={() => void handleRefresh()}
-                disabled={isLoading}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-              >
-                <RefreshCw size={17} className={isLoading ? "animate-spin" : ""} />
-                Refresh
-              </button>
+              <RefreshButton
+                onRefresh={handleRefresh}
+                iconSize={17}
+                className="px-3 py-2.5 text-sm font-medium text-slate-600"
+              />
               <button
                 onClick={() => setShowForm(true)}
                 className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"

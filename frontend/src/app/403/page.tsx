@@ -5,7 +5,7 @@ import { ShieldAlert, ArrowLeft, Home } from "lucide-react";
 
 export default function ForbiddenPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-4 text-center">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-4 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-100 text-red-600 shadow-sm ring-1 ring-red-900/10">
         <ShieldAlert className="h-8 w-8" />
       </div>
@@ -35,6 +35,6 @@ export default function ForbiddenPage() {
           Go to Leads
         </Link>
       </div>
-    </div>
+    </main>
   );
 }
