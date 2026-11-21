@@ -12,12 +12,41 @@ from app.modules.auth.errors import AuthError
 from app.modules.integrations.meta import (
     MetaGraphError,
     MetaProvider,
+    _extract_message_email,
+    _extract_message_phone,
     extract_lead_fields,
     fetch_lead,
     subscribe_page,
 )
 
 PAGE_ID = "123456789012345"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Here is my phn number 01700000000", "+8801700000000"),
+        ("My phone is +1 (415) 555-0100", "+14155550100"),
+        ("Call me at 01648457273", "+8801648457273"),
+        ("01648457273", "+8801648457273"),
+        ("The product costs 15000", None),
+        ("My phone number is not available", None),
+    ],
+)
+def test_extract_message_phone_requires_labeled_valid_number(text, expected):
+    assert _extract_message_phone(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Here is my email test@example.com", "test@example.com"),
+        ("contact me at John.Doe@company.org please", "john.doe@company.org"),
+        ("no email provided", None),
+    ],
+)
+def test_extract_message_email(text, expected):
+    assert _extract_message_email(text) == expected
 
 
 def _leadgen_payload(leadgen_id: str = "987654321") -> dict:
