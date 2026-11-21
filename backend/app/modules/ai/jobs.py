@@ -37,6 +37,7 @@ from typing import Literal
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+import app.database.registry  # noqa: F401
 from app.modules.ai.service import (
     PROMPT_VERSION,
     persist_assessment,

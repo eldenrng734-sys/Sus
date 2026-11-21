@@ -30,6 +30,10 @@ def _client_info(request: Request) -> tuple[str | None, str | None]:
 
 
 def _set_cookies(response: Response, refresh_token: str, csrf_token: str) -> None:
+    # Expire any legacy scoped cookies so they do not shadow path="/" cookies
+    response.delete_cookie(REFRESH_COOKIE, path="/api/v1/auth")
+    response.delete_cookie(CSRF_COOKIE, path="/api/v1/auth")
+
     max_age = settings.refresh_token_expire_days * 24 * 3600
     response.set_cookie(
         REFRESH_COOKIE,
@@ -53,22 +57,79 @@ def _set_cookies(response: Response, refresh_token: str, csrf_token: str) -> Non
 
 def _clear_cookies(response: Response) -> None:
     response.delete_cookie(REFRESH_COOKIE, path=REFRESH_PATH)
+    response.delete_cookie(REFRESH_COOKIE, path="/api/v1/auth")
     response.delete_cookie(CSRF_COOKIE, path="/")
+    response.delete_cookie(CSRF_COOKIE, path="/api/v1/auth")
+
+
+def _is_origin_allowed(origin: str | None) -> bool:
+    if not origin:
+        return True
+    allowed = (
+        set(settings.allowed_origins)
+        | {
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+        }
+        | ({settings.frontend_base_url.rstrip("/")} if settings.frontend_base_url else set())
+    )
+    if origin in allowed:
+        return True
+
+    # In development/test environments, allow developer tunnels (Cloudflare, ngrok, localtunnel)
+    if settings.app_env != "production":
+        from urllib.parse import urlparse
+
+        parsed = urlparse(origin)
+        host = parsed.hostname or ""
+        if (
+            host.endswith(".trycloudflare.com")
+            or host.endswith(".ngrok-free.app")
+            or host.endswith(".loca.lt")
+            or host in {"localhost", "127.0.0.1"}
+        ):
+            return True
+
+    return False
 
 
 def _check_csrf_and_origin(request: Request, header_token: str | None) -> None:
     """Cookie-based endpoints need an allowed Origin and a matching CSRF header + cookie."""
+    import logging as _log
+
+    _logger = _log.getLogger("app.auth")
     origin = request.headers.get("origin")
-    allowed = set(settings.allowed_origins) | {
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-    }
-    if origin and origin not in allowed:
+    if not _is_origin_allowed(origin):
+        _logger.warning("auth_origin_rejected: origin=%r not in allowed", origin)
         raise AuthError(403, "forbidden", f"Origin '{origin}' not allowed")
-    cookie_token = request.cookies.get(CSRF_COOKIE) or ""
-    if not header_token or not secrets.compare_digest(header_token.encode(), cookie_token.encode()):
+
+    # Read cookie tokens from both parsed request.cookies and raw Cookie header
+    # to handle cases where multiple cookies exist across paths.
+    cookie_str = request.headers.get("cookie", "")
+    cookie_tokens: list[str] = []
+    for part in cookie_str.split(";"):
+        k, _, v = part.strip().partition("=")
+        if k == CSRF_COOKIE and v:
+            cookie_tokens.append(v)
+    parsed_cookie = request.cookies.get(CSRF_COOKIE)
+    if parsed_cookie and parsed_cookie not in cookie_tokens:
+        cookie_tokens.append(parsed_cookie)
+
+    matches = bool(
+        header_token
+        and any(
+            secrets.compare_digest(header_token.encode(), ct.encode())
+            for ct in cookie_tokens
+        )
+    )
+    if not matches:
+        _logger.warning(
+            "auth_csrf_rejected: header_token=%r cookie_tokens=%r",
+            header_token,
+            cookie_tokens,
+        )
         raise AuthError(403, "forbidden", "CSRF check failed")
 
 

@@ -3,7 +3,10 @@ let csrfToken: string | null = null;
 function readStorage(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return sessionStorage.getItem("csrf_token");
+    return (
+      sessionStorage.getItem("csrf_token") ??
+      localStorage.getItem("csrf_token")
+    );
   } catch {
     return null;
   }
@@ -34,8 +37,10 @@ export const csrfStore = {
       try {
         if (token) {
           sessionStorage.setItem("csrf_token", token);
+          localStorage.setItem("csrf_token", token);
         } else {
           sessionStorage.removeItem("csrf_token");
+          localStorage.removeItem("csrf_token");
         }
       } catch {
         // ignore
@@ -48,6 +53,7 @@ export const csrfStore = {
     if (typeof window !== "undefined") {
       try {
         sessionStorage.removeItem("csrf_token");
+        localStorage.removeItem("csrf_token");
       } catch {
         // ignore
       }

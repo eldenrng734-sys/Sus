@@ -21,6 +21,7 @@ import sys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+import app.database.registry  # noqa: F401
 from app.core.config import settings
 from app.modules.ai.adapter import get_adapter
 from app.modules.ai.jobs import run_forever
