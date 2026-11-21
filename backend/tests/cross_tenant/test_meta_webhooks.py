@@ -404,6 +404,82 @@ def test_messenger_message_creates_messenger_lead_conversation_and_message(
         assert message.message_text == "I need pricing"
 
 
+def test_messenger_phone_message_updates_existing_lead(
+    hook_client: TestClient,
+    admin_engine: Engine,
+    seed: Seed,
+    meta_account: str,
+):
+    sender_id = str(uuid.uuid4().int)
+    first_mid = "m." + uuid.uuid4().hex
+    phone_mid = "m." + uuid.uuid4().hex
+
+    assert (
+        _post(hook_client, _messenger_body(meta_account, sender_id, first_mid)).status_code
+        == 200
+    )
+    response = _post(
+        hook_client,
+        _messenger_body(
+            meta_account,
+            sender_id,
+            phone_mid,
+            "Here is my phone number 01700000000",
+        ),
+    )
+
+    assert response.status_code == 200, response.text
+    with Session(admin_engine) as session:
+        set_tenant(session, seed.a.id)
+        lead = session.scalar(
+            select(Lead).where(
+                Lead.tenant_id == seed.a.id,
+                Lead.source == "messenger",
+                Lead.external_id == f"messenger:{meta_account}:{sender_id}",
+            )
+        )
+        assert lead is not None
+        assert lead.phone == "+8801700000000"
+
+
+def test_messenger_email_message_updates_existing_lead(
+    hook_client: TestClient,
+    admin_engine: Engine,
+    seed: Seed,
+    meta_account: str,
+):
+    sender_id = str(uuid.uuid4().int)
+    first_mid = "m." + uuid.uuid4().hex
+    email_mid = "m." + uuid.uuid4().hex
+
+    assert (
+        _post(hook_client, _messenger_body(meta_account, sender_id, first_mid)).status_code
+        == 200
+    )
+    response = _post(
+        hook_client,
+        _messenger_body(
+            meta_account,
+            sender_id,
+            email_mid,
+            "My email address is buyer@example.com",
+        ),
+    )
+
+    assert response.status_code == 200, response.text
+    with Session(admin_engine) as session:
+        set_tenant(session, seed.a.id)
+        lead = session.scalar(
+            select(Lead).where(
+                Lead.tenant_id == seed.a.id,
+                Lead.source == "messenger",
+                Lead.external_id == f"messenger:{meta_account}:{sender_id}",
+            )
+        )
+        assert lead is not None
+        assert lead.email == "buyer@example.com"
+
+
 def test_messenger_echo_delivery_and_read_are_not_stored(
     hook_client: TestClient,
     admin_engine: Engine,

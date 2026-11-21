@@ -50,6 +50,10 @@ from app.modules.integrations.registry import register_provider
 from app.modules.integrations.service import CredentialsNotFound, get_credentials
 from app.modules.integrations.signature import verify_signature
 from app.modules.leads.capture import CaptureError, CaptureInput, capture_lead
+from app.modules.leads.capture_normalize import (
+    extract_message_email,
+    extract_message_phone,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +67,9 @@ REQUIRED_SCOPES = frozenset({"leads_retrieval", "ads_management", "pages_manage_
 
 LEAD_FETCH_FIELDS = "field_data,ad_id,form_id"
 MAX_SAFE_ERROR_LENGTH = 200
+
+_extract_message_phone = extract_message_phone
+_extract_message_email = extract_message_email
 
 
 class MetaGraphError(Exception):
@@ -583,6 +590,8 @@ class MetaProvider:
                 message_id=str(message.get("mid") or event.event_id),
                 body_text=body_text,
                 attachment_reference=attachment_reference,
+                phone=_extract_message_phone(body_text),
+                email=_extract_message_email(body_text),
                 # A chat message is not a marketing consent. Messenger sending
                 # is out of scope today, so leave consent for an explicit flow.
                 consent=False,

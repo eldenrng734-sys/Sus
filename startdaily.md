@@ -25,6 +25,8 @@ Open **Terminal 2** (click the `+` icon in the terminal panel), paste this, and 
 ```powershell
 npm --prefix frontend run dev
 ```
+cloudflared tunnel --url http://localhost:3000
+Sharing and connecting meta
 
 *(Keep this terminal open while you work!)*
 

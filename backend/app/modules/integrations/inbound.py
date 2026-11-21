@@ -28,6 +28,10 @@ from sqlalchemy.orm import Session
 from app.core.outbox import emit_message_received
 from app.modules.conversations.models import Conversation, Message
 from app.modules.leads.capture import CaptureInput, CaptureResult, capture_lead
+from app.modules.leads.capture_normalize import (
+    extract_message_email,
+    extract_message_phone,
+)
 from app.modules.leads.optout import apply_opt_out, is_opt_out_message
 
 logger = logging.getLogger(__name__)
@@ -74,13 +78,16 @@ def store_inbound_message(
     inbound: InboundMessage,
 ) -> InboundResult:
     """Store one inbound message using the shared lead-capture pipeline."""
+    phone = inbound.phone or extract_message_phone(inbound.body_text)
+    email = inbound.email or extract_message_email(inbound.body_text)
+
     capture = capture_lead(
         session,
         tenant_id=tenant_id,
         data=CaptureInput(
             name=inbound.contact_name,
-            phone=inbound.phone,
-            email=inbound.email,
+            phone=phone,
+            email=email,
             source=inbound.source,
             external_id=inbound.external_lead_id,
             consent=inbound.consent,
