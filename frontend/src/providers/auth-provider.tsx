@@ -92,6 +92,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // If already authenticated with an active session, skip redundant re-fetches
+      // during client-side route transitions to prevent flash of loading states.
+      if (tokenStore.get() && user) {
+        setIsLoading(false);
+        return;
+      }
+
       // If we don't have an in-memory access token yet, refresh via HttpOnly cookie + CSRF token
       if (!tokenStore.get()) {
         const refreshed = await refreshAccessToken();

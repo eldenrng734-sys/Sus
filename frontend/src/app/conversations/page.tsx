@@ -12,7 +12,6 @@ import {
   Check,
   CheckCheck,
   ArrowUpRight,
-  RefreshCw,
   X,
   FileText,
   ShieldAlert,
@@ -35,6 +34,7 @@ import {
 import { parseApiError } from "@/lib/api-error";
 import { ErrorBanner } from "@/components/shared/error-banner";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import { RefreshButton } from "@/components/shared/refresh-button";
 import { formatTenantDateTime } from "@/lib/format";
 
 const channels = ["All", "WhatsApp", "Messenger"];
@@ -209,13 +209,7 @@ export default function ConversationsPage() {
               </p>
             </div>
 
-            <button
-              onClick={() => void handleRefresh()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
-            >
-              <RefreshCw size={14} />
-              Refresh
-            </button>
+            <RefreshButton onRefresh={handleRefresh} iconSize={14} />
           </div>
 
           {/* Feedback Banners */}

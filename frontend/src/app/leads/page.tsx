@@ -18,6 +18,7 @@ import type { CsvImportResult } from "@/lib/api/leads";
 import { parseApiError } from "@/lib/api-error";
 import { ErrorBanner } from "@/components/shared/error-banner";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import { RefreshButton } from "@/components/shared/refresh-button";
 import { DEFAULT_TIMEZONE } from "@/lib/format";
 
 type Lead = {
@@ -227,6 +228,13 @@ export default function LeadsPage() {
             </div>
 
             <div className="flex items-center gap-3">
+              <RefreshButton
+                onRefresh={() => setRefreshTrigger((prev) => prev + 1)}
+                isRefreshing={loading}
+                iconSize={17}
+                className="px-3.5 py-2.5 text-sm font-semibold"
+              />
+
               {/* CSV Import Button (Manager/Admin only) */}
               {isManagerOrAdmin && (
                 <button

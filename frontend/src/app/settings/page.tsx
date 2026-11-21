@@ -33,6 +33,7 @@ import type { RoleType, TenantMember, Team } from "@/lib/api/settings";
 import { parseApiError } from "@/lib/api-error";
 import { ErrorBanner } from "@/components/shared/error-banner";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import { RefreshButton } from "@/components/shared/refresh-button";
 import { DEFAULT_TIMEZONE } from "@/lib/format";
 
 type SettingsTab = "users" | "teams" | "automation";
@@ -253,6 +254,16 @@ export default function SettingsPage() {
 
             {/* Current Role Badge */}
             <div className="flex items-center gap-3">
+              <RefreshButton
+                onRefresh={handleRefresh}
+                isRefreshing={
+                  activeTab === "users"
+                    ? isLoadingMembers
+                    : activeTab === "teams"
+                      ? isLoadingTeams
+                      : isLoadingAutomation
+                }
+              />
               <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700">
                 <Shield size={13} />
                 ADMIN ROLE

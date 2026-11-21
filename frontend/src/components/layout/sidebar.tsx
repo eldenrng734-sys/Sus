@@ -69,15 +69,18 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
       {/* Sidebar Logo */}
-      <div className="flex h-20 items-end border-b border-slate-100 px-4 dark:border-slate-700">
-        <div className="relative h-16 w-full translate-y-1 overflow-hidden">
+      <div className="flex h-20 items-center border-b border-slate-100 px-4 dark:border-slate-700">
+        <div className="relative h-16 w-full overflow-hidden">
           <Image
-            src="/syntrix-logo.png"
+            src={theme === "dark" ? "/syntrix-logo-dark.png" : "/syntrix-logo-light.png"}
             alt="SYNTRIX CRM"
             fill
             priority
             sizes="208px"
-            className="object-contain object-center scale-[1.8]"
+            className={cn(
+              "object-contain object-center",
+              theme === "dark" ? "scale-100" : "scale-[2]"
+            )}
           />
         </div>
       </div>
@@ -133,7 +136,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             </div>
           </div>
 
-          <NotificationBell />
+          <NotificationBell placement="sidebar" />
         </div>
 
         {/* Theme Toggle */}
@@ -328,7 +331,7 @@ export function Sidebar() {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 self-start border-r border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 md:block">
+      <aside className="sticky top-0 z-30 hidden h-screen w-64 shrink-0 self-start border-r border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 md:block">
         <SidebarContent />
       </aside>
 

@@ -2,8 +2,90 @@ import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
 
+/**
+ * buttonVariants — class-variance-authority schema for the Button component.
+ *
+ * Animation / interaction notes
+ * ─────────────────────────────
+ * • `transition-[color,background-color,border-color,box-shadow,transform,opacity]`
+ *   replaces the original `transition-all`.
+ *
+ *   `transition-all` generates `transition-property: all`, which is immediately
+ *   overridden by the global `button { transition-property: … }` rule in
+ *   globals.css (plain CSS comes after the Tailwind layer in the cascade).
+ *   The result is that Tailwind's own transition utility loses the race and the
+ *   button's timing curve / duration are both discarded — the global 160 ms /
+ *   cubic-bezier rule wins instead.
+ *
+ *   By listing the exact same properties the global rule lists (plus `outline`
+ *   for the border-based focus ring) we produce an identical result *and* give
+ *   Tailwind the chance to control duration/easing via additional utilities when
+ *   needed, without depending on `all`.
+ *
+ * • `outline-none` is kept — the button manages focus visibility itself through
+ *   `focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50`.
+ *   The global `button:focus-visible { outline: 2px solid #3b82f6 }` rule in
+ *   globals.css must NOT fire for this component because it is a hard-coded
+ *   colour that bypasses the design token and cannot animate (outline is not
+ *   transitioable in CSS). `outline-none` wins here — it has equal specificity
+ *   but higher source order inside the Tailwind layer, so it takes precedence.
+ *
+ *   However `outline-none` from Tailwind's base layer sets `outline: none`.
+ *   The global plain-CSS rule `button:focus-visible { outline: … }` has equal
+ *   element-selector specificity but comes *after* the Tailwind layer, so it
+ *   OVERRIDES `outline-none` for keyboard focus — causing a sudden hard-edged
+ *   blue outline to appear on top of the box-shadow ring.
+ *
+ *   Fix: use `focus-visible:outline-none` (applies at the same cascade layer as
+ *   the global rule but as an inline utility it has higher specificity via the
+ *   Tailwind utility class) so the browser cannot fall back to the global outline.
+ *
+ * • `active:not-aria-[haspopup]:translate-y-px` — 1 px press-down feedback.
+ *   Requires `transform` in transition-property to ease smoothly (now included).
+ */
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  [
+    // Layout & base
+    "group/button inline-flex shrink-0 items-center justify-center",
+    "rounded-lg border border-transparent bg-clip-padding",
+    "text-sm font-medium whitespace-nowrap",
+    "select-none",
+
+    // ── Transition ──────────────────────────────────────────────────────────
+    // Explicit property list instead of `transition-all` so the Tailwind utility
+    // is not silently overridden by the global `button { transition-property }` rule.
+    // Includes `outline` so the focus-border animates; `box-shadow` for the ring;
+    // `transform` for the active:translate-y-px press feedback.
+    "transition-[color,background-color,border-color,box-shadow,outline,transform,opacity]",
+    "duration-[160ms]",
+    "ease-[cubic-bezier(0.2,0,0,1)]",
+
+    // ── Focus ────────────────────────────────────────────────────────────────
+    // `focus-visible:outline-none` overrides the global `button:focus-visible
+    // { outline: 2px solid #3b82f6 }` plain-CSS rule (higher specificity via
+    // Tailwind's utility class) so only the box-shadow ring is shown — no
+    // competing hard-coded outline flash.
+    "focus-visible:outline-none",
+    "focus-visible:border-ring",
+    "focus-visible:ring-3",
+    "focus-visible:ring-ring/50",
+
+    // ── Press feedback ───────────────────────────────────────────────────────
+    "active:not-aria-[haspopup]:translate-y-px",
+
+    // ── Reduced motion ────────────────────────────────────────────────────────
+    "motion-reduce:transition-none motion-reduce:transform-none",
+
+    // ── Disabled ─────────────────────────────────────────────────────────────
+    "disabled:pointer-events-none disabled:opacity-50",
+
+    // ── Validation ───────────────────────────────────────────────────────────
+    "aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20",
+    "dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+
+    // ── SVG children ─────────────────────────────────────────────────────────
+    "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  ].join(" "),
   {
     variants: {
       variant: {

@@ -6,6 +6,7 @@ import { RouteGuard } from "@/components/auth/route-guard";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { ErrorBanner } from "@/components/shared/error-banner";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import { RefreshButton } from "@/components/shared/refresh-button";
 import { parseApiError } from "@/lib/api-error";
 import {
   useIntegrations,
@@ -36,7 +37,7 @@ import {
 } from "lucide-react";
 
 export default function IntegrationsPage() {
-  const { data: integrations, isLoading, error } = useIntegrations();
+  const { data: integrations, isLoading, error, refetch, isFetching } = useIntegrations();
   const { data: leadForm } = useLeadForm();
   const connectMutation = useConnectIntegration();
   const disconnectMutation = useDisconnectIntegration();
@@ -163,10 +164,14 @@ export default function IntegrationsPage() {
               </h1>
             </div>
             <div className="flex items-center gap-3">
+              <RefreshButton
+                onRefresh={() => refetch()}
+                isRefreshing={isFetching}
+              />
               <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
                 Admin Area
               </span>
-              <NotificationBell />
+              <NotificationBell placement="header" />
             </div>
           </header>
 

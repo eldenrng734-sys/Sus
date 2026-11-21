@@ -10,7 +10,6 @@ import {
   TrendingUp,
   ArrowUpRight,
   ShieldAlert,
-  RefreshCw,
   MessageSquare,
   Award,
   Bot,
@@ -37,6 +36,7 @@ import type {
 } from "@/lib/api/dashboard";
 import { formatTenantDateTime, DEFAULT_TIMEZONE } from "@/lib/format";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import { RefreshButton } from "@/components/shared/refresh-button";
 
 type DatePreset = "7d" | "30d" | "90d";
 
@@ -219,13 +219,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Refresh button */}
-              <button
-                onClick={() => void refetch()}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
-              >
-                <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
-                Refresh
-              </button>
+              <RefreshButton onRefresh={() => refetch()} iconSize={13} />
             </div>
           </section>
 
@@ -413,21 +407,30 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="mt-6 h-64 w-full">
-                    {mounted && pipelineChartData.length > 0 ? (
+                    {/* Skeleton: shown only while data hasn't arrived yet (not mounted
+                        or chart data array is still empty). Once mounted+data is
+                        available we always show either the real chart or the empty
+                        state — the skeleton must never pulse after data loads. */}
+                    {!mounted || pipelineChartData.length === 0 ? (
+                      <div className="flex h-full items-end justify-between gap-4 px-4 pb-4 animate-pulse">
+                        {[40, 65, 30, 85, 50, 20].map((h, i) => (
+                          <div
+                            key={i}
+                            className="flex-1 rounded-t-md bg-slate-100 dark:bg-slate-800"
+                            style={{ height: `${h}%` }}
+                          />
+                        ))}
+                      </div>
+                    ) : pipelineChartData.some((item) => item.count > 0) ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                           data={pipelineChartData}
                           margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                         >
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                          <XAxis
-                            dataKey="name"
-                            tick={{ fontSize: 11, fill: "#64748b" }}
-                            axisLine={false}
-                            tickLine={false}
-                          />
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" opacity={0.2} />
+                          <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                           <YAxis
-                            tick={{ fontSize: 11, fill: "#64748b" }}
+                            tick={{ fontSize: 11, fill: "#94a3b8" }}
                             axisLine={false}
                             tickLine={false}
                             allowDecimals={false}
@@ -435,8 +438,10 @@ export default function DashboardPage() {
                           <Tooltip
                             contentStyle={{
                               borderRadius: "12px",
-                              border: "1px solid #e2e8f0",
-                              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                              border: "1px solid var(--border)",
+                              backgroundColor: "var(--card)",
+                              color: "var(--foreground)",
+                              boxShadow: "0 4px 12px rgb(0 0 0 / 0.12)",
                               fontSize: "12px",
                             }}
                           />
@@ -448,14 +453,12 @@ export default function DashboardPage() {
                         </BarChart>
                       </ResponsiveContainer>
                     ) : (
-                      <div className="flex h-full items-end justify-between gap-4 px-4 pb-4 animate-pulse">
-                        {[40, 65, 30, 85, 50, 20].map((h, i) => (
-                          <div
-                            key={i}
-                            className="flex-1 rounded-t-md bg-slate-100"
-                            style={{ height: `${h}%` }}
-                          />
-                        ))}
+                      /* All pipeline counts are 0 — data loaded but no activity yet */
+                      <div className="flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 px-6 text-center dark:border-slate-700">
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">No pipeline activity yet</p>
+                        <p className="mt-2 max-w-xs text-xs leading-5 text-slate-500 dark:text-slate-400">
+                          Your lead pipeline will appear here when leads are added to SYNTRIX.
+                        </p>
                       </div>
                     )}
                   </div>
