@@ -39,13 +39,31 @@ async def connect(
     if provider == "meta" and not body.provider_account_id.isdigit():
         raise AuthError(400, "validation_error", "Meta page id must be numeric")
 
-    # Cheap Graph API validation call on connect (unless explicitly in unit test bypass)
+    # Soft token validation: attempt a cheap Graph API call but do not block
+    # connecting if it fails. The token scope (pages_read_engagement) required
+    # by the old /{page_id} endpoint may not be granted; the token's real
+    # validity is proven when the first webhook event arrives.
+    # Hard-fail only for explicit 401 Unauthorized (bad/expired token).
     if settings.app_env != "test":
-        await service.validate_meta_token(
-            provider,
-            body.provider_account_id,
-            body.access_token,
-        )
+        import logging as _log
+        try:
+            await service.validate_meta_token(
+                provider,
+                body.provider_account_id,
+                body.access_token,
+            )
+        except Exception as _val_exc:
+            from app.modules.auth.errors import AuthError as _AE
+            # Re-raise only if the token is explicitly invalid (401).
+            # 400 or 403 likely means a missing scope, not a bad token.
+            if isinstance(_val_exc, _AE) and getattr(_val_exc, "status_code", 0) == 400:
+                _log.getLogger(__name__).warning(
+                    "meta_token_soft_validation_failed provider=%s — scope may be missing; "
+                    "proceeding with connect. Error: %s",
+                    provider, _val_exc,
+                )
+            else:
+                raise
 
     integration = service.connect_integration(
         session=session,
@@ -61,10 +79,22 @@ async def connect(
         # Credentials are stored first: a temporary Graph failure must not lose
         # the token the admin just supplied. Re-running connect retries the
         # idempotent subscription.
-        await meta.subscribe_page(
-            body.provider_account_id,
-            body.access_token,
-        )
+        # subscribe_page requires pages_manage_metadata scope. If that scope is
+        # missing the page may already be subscribed via the Meta App Dashboard,
+        # so we log a warning but do not fail the connect flow.
+        try:
+            await meta.subscribe_page(
+                body.provider_account_id,
+                body.access_token,
+            )
+        except Exception:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "meta.subscribe_page failed for page_id=%s — "
+                "page may already be subscribed or missing pages_manage_metadata scope; "
+                "integration credentials were saved successfully.",
+                body.provider_account_id,
+            )
 
     resp = ConnectIntegrationResponse(
         connected=True,

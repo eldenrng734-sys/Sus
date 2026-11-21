@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     # HMAC key for all Meta webhook signatures (X-Hub-Signature-256).
     meta_app_secret: SecretStr = SecretStr("")
     # Token compared against hub.verify_token in GET handshake challenges.
+    webhook_verify_token: SecretStr = SecretStr("")
+    meta_verify_token: SecretStr = SecretStr("")
     whatsapp_verify_token: SecretStr = SecretStr("")
     # Graph API version — set in env, never hardcoded in business logic.
     meta_graph_version: str = "v21.0"

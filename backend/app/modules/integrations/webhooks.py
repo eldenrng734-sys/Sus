@@ -333,7 +333,14 @@ def verify_challenge(
         if p is not None:
             return p.verify_challenge(mode, token, challenge)
 
-    expected = settings.webhook_verify_token.get_secret_value()
+    expected = (
+        (
+            settings.meta_verify_token.get_secret_value()
+            if provider == "meta"
+            else settings.whatsapp_verify_token.get_secret_value()
+        )
+        or settings.webhook_verify_token.get_secret_value()
+    )
 
     if (
         mode == "subscribe"

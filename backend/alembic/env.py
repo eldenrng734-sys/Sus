@@ -10,7 +10,14 @@ from app.database.base import Base
 config = context.config
 
 # Select the migration URL explicitly.
-database_url = getattr(settings, "migration_database_url", "") or settings.database_url
+# If migration_database_url points to localhost/127.0.0.1 (host port) but we are
+# running inside the Docker container where PostgreSQL is at 'db:5432',
+# fallback to settings.database_url to prevent 'Connection refused'.
+migration_url = getattr(settings, "migration_database_url", "")
+if migration_url and ("localhost" in migration_url or "127.0.0.1" in migration_url) and "db" in settings.database_url:
+    database_url = settings.database_url
+else:
+    database_url = migration_url or settings.database_url
 
 config.set_main_option(
     "sqlalchemy.url",

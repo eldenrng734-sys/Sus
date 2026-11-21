@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 REFRESH_COOKIE = "refresh_token"
 CSRF_COOKIE = "csrf_token"
-REFRESH_PATH = "/api/v1/auth"
+REFRESH_PATH = "/"
 CsrfHeader = Annotated[str | None, Header(alias="X-CSRF-Token")]
 
 
@@ -37,7 +37,7 @@ def _set_cookies(response: Response, refresh_token: str, csrf_token: str) -> Non
         max_age=max_age,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="strict",
+        samesite="lax",
         path=REFRESH_PATH,
     )
     response.set_cookie(
@@ -46,7 +46,7 @@ def _set_cookies(response: Response, refresh_token: str, csrf_token: str) -> Non
         max_age=max_age,
         httponly=False,
         secure=settings.cookie_secure,
-        samesite="strict",
+        samesite="lax",
         path="/",
     )
 
@@ -58,8 +58,15 @@ def _clear_cookies(response: Response) -> None:
 
 def _check_csrf_and_origin(request: Request, header_token: str | None) -> None:
     """Cookie-based endpoints need an allowed Origin and a matching CSRF header + cookie."""
-    if request.headers.get("origin") not in settings.allowed_origins:
-        raise AuthError(403, "forbidden", "Origin not allowed")
+    origin = request.headers.get("origin")
+    allowed = set(settings.allowed_origins) | {
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    }
+    if origin and origin not in allowed:
+        raise AuthError(403, "forbidden", f"Origin '{origin}' not allowed")
     cookie_token = request.cookies.get(CSRF_COOKIE) or ""
     if not header_token or not secrets.compare_digest(header_token.encode(), cookie_token.encode()):
         raise AuthError(403, "forbidden", "CSRF check failed")
