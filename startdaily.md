@@ -81,6 +81,7 @@ docker compose --env-file .env -f infrastructure\docker-compose.yml exec backend
 | **I changed Python code and need backend to update** | `docker compose --env-file .env -f infrastructure\docker-compose.yml restart backend` |
 | **I need to update database tables (run migrations)** | `docker compose --env-file .env -f infrastructure\docker-compose.yml exec backend alembic upgrade head` |
 | **I want to see backend error logs** | `docker logs infrastructure-backend-1 --tail 50 -f` |
+| **I need 200 My View & 2,000 Team View dummy leads for presentation** | `docker exec infrastructure-backend-1 python -m app.scripts.seed_presentation_data` |
 | **I need fresh demo accounts / sample data** | `docker compose --env-file .env -f infrastructure\docker-compose.yml exec backend python -m app.scripts.seed` |
 | **I want to start AI worker & n8n workflows** | `docker compose --env-file .env -f infrastructure\docker-compose.yml up -d worker dispatcher n8n_db n8n` |
 

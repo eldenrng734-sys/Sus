@@ -79,6 +79,19 @@ When a prospective customer (a **Lead**) fills out a form on Acme's website or s
 
 ---
 
+Exact CSV Format Required
+
+Your CSV must have headers in lowercase (or standard text) and include at least:
+
+name (Required)
+email OR phone (At least one is required; you can have both)
+1. Minimal Working CSV Example
+csvs
+name,email,phone
+John Doe,john@example.com,+12345678901
+Jane Smith,jane@example.com,
+Alex Brown,,+8801700000000
+
 ## 2. Function-by-Function Map
 
 Here is the exact map of which function talks to which function, what goes in, and what comes out. You can match these names directly to the code files in your project.

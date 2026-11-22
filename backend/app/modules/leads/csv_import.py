@@ -125,6 +125,20 @@ def _to_lead(clean: dict[str, str]) -> LeadCreate:
             "Consent must be yes/no, true/false, y/n, or 1/0",
         )
 
+    raw_status = clean.get("status", "").strip().lower()
+    valid_statuses = {"new", "contacted", "qualified", "proposal", "won", "lost"}
+    status = raw_status if raw_status in valid_statuses else "new"
+
+    raw_priority = clean.get("priority", "").strip().lower()
+    valid_priorities = {"low", "medium", "high"}
+    priority = raw_priority if raw_priority in valid_priorities else "medium"
+
+    raw_lost_reason = clean.get("lost_reason", "").strip().lower()
+    valid_lost_reasons = {"price", "timing", "no_response", "competitor", "not_qualified", "other"}
+    lost_reason = raw_lost_reason if raw_lost_reason in valid_lost_reasons else None
+    if status == "lost" and not lost_reason:
+        lost_reason = "other"
+
     return LeadCreate(
         name=neutralize(clean.get("name", "")),
         email=clean.get("email") or None,
@@ -135,6 +149,9 @@ def _to_lead(clean: dict[str, str]) -> LeadCreate:
             neutralize(clean["source_campaign"]) if clean.get("source_campaign") else None
         ),
         external_id=(neutralize(clean["external_id"]) if clean.get("external_id") else None),
+        status=status,
+        priority=priority,
+        lost_reason=lost_reason,
         consent=consent_value in TRUE_VALUES,
         notes=notes,
     )

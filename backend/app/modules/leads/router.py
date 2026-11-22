@@ -136,6 +136,15 @@ def get_leads(
     return {"data": data, "meta": meta}
 
 
+@router.get("/stats")
+def get_leads_stats(
+    context: Annotated[TenantContext, Depends(require_any_member)],
+    session: Session = Depends(get_session),
+) -> dict:
+    """Return overall lead counts: total, new, and high priority."""
+    return {"data": crud.get_leads_stats(session, context)}
+
+
 @router.get("/{lead_id}")
 def get_lead_detail(
     lead_id: uuid.UUID,

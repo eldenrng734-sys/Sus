@@ -13,7 +13,7 @@ import {
 import { Sidebar } from "@/components/layout/sidebar";
 import { useAuth } from "@/providers/auth-provider";
 import { fetchLeads } from "@/lib/leads-api";
-import { useImportCsv } from "@/hooks/use-leads";
+import { useImportCsv, useLeadStats } from "@/hooks/use-leads";
 import type { CsvImportResult } from "@/lib/api/leads";
 import { parseApiError } from "@/lib/api-error";
 import { ErrorBanner } from "@/components/shared/error-banner";
@@ -94,6 +94,7 @@ export default function LeadsPage() {
   const [csvError, setCsvError] = useState<{ title: string; message: string } | null>(null);
 
   const importCsvMutation = useImportCsv();
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useLeadStats();
 
   useEffect(() => {
     let cancelled = false;
@@ -173,6 +174,7 @@ export default function LeadsPage() {
       setCsvResult(res);
       if (!dryRun) {
         setRefreshTrigger((prev) => prev + 1);
+        void refetchStats();
       }
     } catch (err) {
       const parsed = parseApiError(err);
@@ -229,8 +231,11 @@ export default function LeadsPage() {
 
             <div className="flex items-center gap-3">
               <RefreshButton
-                onRefresh={() => setRefreshTrigger((prev) => prev + 1)}
-                isRefreshing={loading}
+                onRefresh={() => {
+                  setRefreshTrigger((prev) => prev + 1);
+                  void refetchStats();
+                }}
+                isRefreshing={loading || statsLoading}
                 iconSize={17}
                 className="px-3.5 py-2.5 text-sm font-semibold"
               />
@@ -259,19 +264,19 @@ export default function LeadsPage() {
           <section className="grid gap-4 sm:grid-cols-3">
             {[
               {
-                label: "Total on page",
-                value: leads.length,
-                note: "Up to 25 per page",
+                label: "Total leads overall",
+                value: stats ? stats.total.toLocaleString() : (statsLoading ? "--" : "0"),
+                note: "All leads in workspace",
               },
               {
-                label: "New (this page)",
-                value: leads.filter((lead) => lead.status === "new").length,
+                label: "Total new leads",
+                value: stats ? stats.new.toLocaleString() : (statsLoading ? "--" : "0"),
                 note: "Status = New",
               },
               {
-                label: "High priority (this page)",
-                value: leads.filter((lead) => lead.priority === "high").length,
-                note: "Use filters for full counts",
+                label: "Total high priority",
+                value: stats ? stats.high_priority.toLocaleString() : (statsLoading ? "--" : "0"),
+                note: "Priority = High",
               },
             ].map((metric) => (
               <article
@@ -280,7 +285,7 @@ export default function LeadsPage() {
               >
                 <p className="text-sm font-medium text-slate-500">{metric.label}</p>
                 <p className="mt-3 text-2xl font-bold text-slate-900">
-                  {loading ? "--" : metric.value}
+                  {statsLoading && !stats ? "--" : metric.value}
                 </p>
                 {"note" in metric && (
                   <p className="mt-1 text-xs text-slate-400">{metric.note}</p>

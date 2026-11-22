@@ -86,6 +86,21 @@ export interface TimelineEvent {
   details: Record<string, unknown>;
 }
 
+export type LeadStats = {
+  total: number;
+  new: number;
+  high_priority: number;
+};
+
+export async function getLeadStats(): Promise<LeadStats> {
+  const response = await apiRequest<{ data: LeadStats }>("/leads/stats", {
+    method: "GET",
+    auth: true,
+    tenantScoped: true,
+  });
+  return response.data;
+}
+
 export interface CsvImportError {
   row: number;
   code: string;
