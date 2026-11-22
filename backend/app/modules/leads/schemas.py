@@ -83,6 +83,9 @@ class LeadCreate(BaseModel):
     source: LeadSource = "manual"
     source_campaign: str | None = Field(default=None, max_length=200)
     external_id: str | None = Field(default=None, max_length=200)
+    status: LeadStatus = "new"
+    priority: LeadPriority = "medium"
+    lost_reason: LostReason | None = None
     consent: bool = False
     assigned_user_id: uuid.UUID | None = None
     team_id: uuid.UUID | None = None
@@ -113,6 +116,11 @@ class LeadCreate(BaseModel):
 
         if self.external_id is not None and not self.external_id:
             raise ValueError("external_id cannot be blank")
+
+        if self.status == "lost" and not self.lost_reason:
+            self.lost_reason = "other"
+        elif self.status != "lost":
+            self.lost_reason = None
 
         return self
 

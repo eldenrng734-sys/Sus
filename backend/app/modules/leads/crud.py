@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, asc, desc, func, or_, select
+from sqlalchemy import and_, asc, case, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -252,7 +252,9 @@ def create_lead(
             source=body.source,
             source_campaign=body.source_campaign,
             external_id=body.external_id,
-            priority="medium",
+            status=body.status,
+            priority=body.priority,
+            lost_reason=body.lost_reason,
             consent=body.consent,
             version=1,
             consent_at=datetime.now(UTC) if body.consent else None,
@@ -485,6 +487,25 @@ def list_leads(
         [lead_out(row) for row in rows],
         {"next_cursor": next_cursor, "has_more": has_more},
     )
+
+
+def get_leads_stats(session: Session, ctx: TenantContext) -> dict:
+    """Return total count, total new leads, and total high priority leads across the entire tenant."""
+    query = apply_data_scope(
+        select(
+            func.count(Lead.id).label("total"),
+            func.count(case((Lead.status == "new", Lead.id))).label("total_new"),
+            func.count(case((Lead.priority == "high", Lead.id))).label("total_high_priority"),
+        ),
+        Lead,
+        ctx,
+    )
+    row = session.execute(query).one()
+    return {
+        "total": int(row.total or 0),
+        "new": int(row.total_new or 0),
+        "high_priority": int(row.total_high_priority or 0),
+    }
 
 
 def get_lead(

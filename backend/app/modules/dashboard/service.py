@@ -42,7 +42,7 @@ from app.modules.integrations.models import Integration
 from app.modules.leads.models import Lead
 from app.modules.settings.models import TenantSettings
 from app.modules.tasks.models import Task
-from app.modules.tenants.models import TenantMembership
+from app.modules.tenants.models import Team, TenantMembership
 from app.modules.users.models import User
 
 logger = logging.getLogger("app.dashboard")
@@ -81,6 +81,10 @@ def get_dashboard_summary(
     elif scope == "team":
         # Resolve target team
         target_team = team_id if context.role == "admin" and team_id else context.team_id
+        if target_team is None and context.role == "admin":
+            target_team = session.scalar(
+                select(Team.id).where(Team.tenant_id == context.tenant_id).order_by(Team.created_at).limit(1)
+            )
         return _build_team_dashboard(
             session, context, target_team, period, range_start, range_end, today_start, today_end
         )

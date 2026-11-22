@@ -7,10 +7,20 @@ import {
   addLeadNote,
   reviewAssessment,
   importLeadsCsv,
+  getLeadStats,
   type LeadStatus,
   type LostReason,
   type LeadPriority,
+  type LeadStats,
 } from "@/lib/api/leads";
+
+export function useLeadStats() {
+  return useQuery<LeadStats>({
+    queryKey: ["leads-stats"],
+    queryFn: getLeadStats,
+    refetchInterval: 15_000,
+  });
+}
 
 export function useLeads(params: URLSearchParams) {
   const queryKey = ["leads", params.toString()];
